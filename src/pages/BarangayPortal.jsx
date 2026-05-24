@@ -28,6 +28,7 @@ export default function BarangayPortal() {
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const barangaySchedule = findBarangaySchedule(profile?.barangay);
   const searchedRequests = searchCollectionRequests(requests, searchTerm);
@@ -135,16 +136,16 @@ export default function BarangayPortal() {
     "Barangay User";
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] flex text-gray-900">
-      <div className="sticky top-0 h-screen self-start overflow-y-auto bg-green-950">
-        <BarangaySidebar
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          barangay={profile?.barangay}
-        />
-      </div>
+    <div className="min-h-screen bg-[#f4f7f3] text-gray-900 lg:flex">
+      <BarangaySidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        barangay={profile?.barangay}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+      <main className="min-w-0 flex-1 w-full p-3 sm:p-5 lg:p-8 overflow-x-hidden">
         <BarangayHeader
           activeSection={activeSection}
           searchTerm={showSearch ? searchTerm : ""}
@@ -157,11 +158,12 @@ export default function BarangayPortal() {
           userEmail={userEmail}
           onLogout={handleLogout}
           onChangePassword={handleChangePassword}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
         {activeSection === "dashboard" && (
           <>
-            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5 mb-6 lg:mb-8">
               <BarangayStatCard
                 title="Collection Requests"
                 value={requests.length}
@@ -195,19 +197,22 @@ export default function BarangayPortal() {
               />
             </section>
 
-            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
               <BarangayScheduleCard
                 schedule={barangaySchedule}
                 barangay={profile?.barangay}
               />
 
-              <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border p-6">
-                <h3 className="text-xl font-bold">Collection Point Overview</h3>
-                <p className="text-sm text-gray-500 mb-6">
+              <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border p-5 sm:p-6 min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold">
+                  Collection Point Overview
+                </h3>
+
+                <p className="text-sm text-gray-500 mb-5 sm:mb-6">
                   Summary of waste gathered at the barangay collection point.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 lg:gap-5">
                   <OverviewCard title="Collection Point" value="Barangay Hall" />
                   <OverviewCard title="Total Requests" value={requests.length} />
                   <OverviewCard title="Pending" value={pendingCount} />

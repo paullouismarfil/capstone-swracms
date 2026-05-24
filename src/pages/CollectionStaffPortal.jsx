@@ -28,6 +28,7 @@ export default function CollectionStaffPortal() {
 
   const [collectorProfile, setCollectorProfile] = useState(null);
   const [collectorEmail, setCollectorEmail] = useState("");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     loadCollectorProfile();
@@ -278,15 +279,15 @@ export default function CollectionStaffPortal() {
     "Collection Staff";
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] flex text-gray-900">
-      <div className="sticky top-0 h-screen self-start overflow-y-auto bg-green-950">
-        <CollectorSidebar
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-        />
-      </div>
+    <div className="min-h-screen bg-[#f4f7f3] text-gray-900 lg:flex">
+      <CollectorSidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+      <main className="min-w-0 flex-1 w-full p-3 sm:p-5 lg:p-8 overflow-x-hidden">
         <CollectorHeader
           activeSection={activeSection}
           searchTerm={showSearch ? searchTerm : ""}
@@ -297,11 +298,12 @@ export default function CollectionStaffPortal() {
           collectorEmail={collectorEmail}
           onLogout={handleLogout}
           onChangePassword={handleChangePassword}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
         {activeSection === "dashboard" && (
           <>
-            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5 mb-6 lg:mb-8">
               <CollectorStatCard
                 title="Assigned Pickups"
                 value={searchedRequests.length}
@@ -342,7 +344,7 @@ export default function CollectionStaffPortal() {
               filteredRequests={filteredRequests}
             />
 
-            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
               <AssignedRequestsTable
                 requests={searchedRequests.slice(0, 5)}
                 loading={loading}

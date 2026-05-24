@@ -29,6 +29,7 @@ export default function LGUPortal() {
 
   const [adminProfile, setAdminProfile] = useState(null);
   const [adminEmail, setAdminEmail] = useState("");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     loadAdminProfile();
@@ -194,7 +195,6 @@ export default function LGUPortal() {
       return;
     }
 
-    // Private notification for the barangay user who submitted the request.
     if (requestData.submitted_by) {
       await supabase.from("notifications").insert([
         {
@@ -262,15 +262,15 @@ export default function LGUPortal() {
     "MENRO Admin";
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] flex text-gray-900">
-      <div className="sticky top-0 h-screen self-start overflow-y-auto bg-green-950">
-        <LGUSidebar
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-        />
-      </div>
+    <div className="min-h-screen bg-[#f4f7f3] text-gray-900 lg:flex">
+      <LGUSidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+      <main className="min-w-0 flex-1 w-full p-3 sm:p-5 lg:p-8 overflow-x-hidden">
         <LGUTopHeader
           activeSection={activeSection}
           searchTerm={activeSection === "reports" ? searchTerm : ""}
@@ -283,6 +283,7 @@ export default function LGUPortal() {
           adminEmail={adminEmail}
           onLogout={handleLogout}
           onChangePassword={handleChangePassword}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
         {activeSection === "dashboard" && (
@@ -294,8 +295,8 @@ export default function LGUPortal() {
               totalWasteKg={analytics.totalKg}
             />
 
-            <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 mt-6">
-              <div className="xl:col-span-8 space-y-6">
+            <section className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 mt-5 lg:mt-6">
+              <div className="xl:col-span-8 space-y-4 lg:space-y-6 min-w-0">
                 <ReportsTable
                   reports={searchedRequests.slice(0, 5)}
                   loading={loadingRequests}
@@ -306,13 +307,13 @@ export default function LGUPortal() {
                 <CollectionMap requests={requests} compact />
               </div>
 
-              <div className="xl:col-span-4 space-y-6">
+              <div className="xl:col-span-4 space-y-4 lg:space-y-6 min-w-0">
                 <LGUWasteCompositionCard analytics={analytics} />
                 <LGUAnalyticsSummaryCard analytics={analytics} />
               </div>
             </section>
 
-            <section className="mt-6">
+            <section className="mt-5 lg:mt-6">
               <LGUScheduleSection schedules={schedules} compact />
             </section>
           </>
@@ -347,11 +348,13 @@ export default function LGUPortal() {
         {activeSection === "map" && <CollectionMap requests={requests} />}
 
         {activeSection === "leaderboard" && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
             <LGULeaderboardSection />
 
-            <div className="bg-white rounded-3xl shadow-sm border p-6">
-              <h3 className="text-xl font-bold">Ranking Criteria</h3>
+            <div className="bg-white rounded-3xl shadow-sm border p-5 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold">
+                Ranking Criteria
+              </h3>
 
               <p className="text-sm text-gray-500 mb-5">
                 Barangay performance is based on actual collected requests,
