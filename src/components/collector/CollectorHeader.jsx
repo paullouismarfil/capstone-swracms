@@ -1,4 +1,5 @@
 import { useState } from "react";
+import NotificationBell from "../NotificationBell";
 import {
   Search,
   ChevronDown,
@@ -7,18 +8,49 @@ import {
   LogOut,
   X,
   Mail,
+  Truck,
   ShieldCheck,
 } from "lucide-react";
-import NotificationBell from "../NotificationBell";
 
-export default function LGUTopHeader({
+function getPageTitle(activeSection) {
+  const titles = {
+    dashboard: "Collection Staff Dashboard",
+    assigned: "Assigned Pickup Requests",
+    status: "Update Collection Status",
+    notifications: "Notifications",
+    recording: "Waste Recording",
+    history: "Collection History",
+  };
+
+  return titles[activeSection] || "Collection Staff Dashboard";
+}
+
+function getPageSubtitle(activeSection) {
+  const subtitles = {
+    dashboard:
+      "View live assigned pickup requests, filter by route, update progress, and record actual collected waste.",
+    assigned:
+      "Review scheduled barangay requests assigned to the MENRO collection team.",
+    status:
+      "Update the status of assigned collection requests after pickup operations.",
+    notifications:
+      "View assigned pickup alerts, route updates, and completed collection notifications.",
+    recording:
+      "Encode actual waste collected after the MENRO garbage truck completes pickup.",
+    history: "Review previously encoded waste collection records.",
+  };
+
+  return subtitles[activeSection] || "";
+}
+
+export default function CollectorHeader({
   activeSection,
   searchTerm = "",
   setSearchTerm,
   showSearch = false,
-  showBell = true,
-  adminName = "MENRO Admin",
-  adminEmail = "",
+  showBell = false,
+  collectorName = "Collection Staff",
+  collectorEmail = "",
   onLogout,
   onChangePassword,
 }) {
@@ -50,16 +82,15 @@ export default function LGUTopHeader({
 
               <input
                 type="text"
-                placeholder="Search waste reports..."
+                placeholder="Search requests..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm?.(e.target.value)}
-                className="outline-none text-sm bg-transparent w-44"
+                className="outline-none text-sm bg-transparent w-40"
               />
             </div>
           )}
 
-          {/* Always visible for LGU Admin */}
-          <NotificationBell role="lgu_admin" />
+          {showBell && <NotificationBell role="collector" />}
 
           <div className="relative">
             <button
@@ -68,16 +99,16 @@ export default function LGUTopHeader({
               className="flex items-center gap-3 bg-white border shadow-sm px-3 py-2 rounded-2xl hover:bg-gray-50 transition"
             >
               <div className="w-10 h-10 rounded-full bg-green-100 text-green-800 flex items-center justify-center text-sm font-bold">
-                {getInitials(adminName)}
+                {getInitials(collectorName)}
               </div>
 
               <div className="hidden md:block text-left">
                 <p className="text-sm font-bold text-gray-900 max-w-[160px] truncate">
-                  {adminName}
+                  {collectorName || "Collection Staff"}
                 </p>
 
                 <p className="text-xs text-gray-500 max-w-[180px] truncate">
-                  {adminEmail || "LGU Administrator"}
+                  {collectorEmail || "MENRO Collection Team"}
                 </p>
               </div>
 
@@ -88,11 +119,11 @@ export default function LGUTopHeader({
               <div className="absolute right-0 mt-3 w-72 bg-white border rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b">
                   <p className="text-sm font-bold text-gray-900">
-                    {adminName}
+                    {collectorName || "Collection Staff"}
                   </p>
 
                   <p className="text-sm text-gray-500 truncate">
-                    {adminEmail || "No email found"}
+                    {collectorEmail || "No email found"}
                   </p>
                 </div>
 
@@ -119,7 +150,10 @@ export default function LGUTopHeader({
 
                 <button
                   type="button"
-                  onClick={onLogout}
+                  onClick={() => {
+                    setOpenProfileMenu(false);
+                    onLogout?.();
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 transition border-t"
                 >
                   <LogOut size={18} />
@@ -138,7 +172,7 @@ export default function LGUTopHeader({
               <div>
                 <h3 className="text-2xl font-bold">My Profile</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  LGU administrator account information.
+                  Collection staff account information.
                 </p>
               </div>
 
@@ -154,15 +188,16 @@ export default function LGUTopHeader({
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-16 h-16 rounded-full bg-green-100 text-green-800 flex items-center justify-center text-xl font-bold">
-                  {getInitials(adminName)}
+                  {getInitials(collectorName)}
                 </div>
 
                 <div>
                   <p className="text-lg font-bold text-gray-900">
-                    {adminName}
+                    {collectorName || "Collection Staff"}
                   </p>
+
                   <p className="text-sm text-gray-500">
-                    {adminEmail || "No email found"}
+                    {collectorEmail || "No email found"}
                   </p>
                 </div>
               </div>
@@ -170,26 +205,26 @@ export default function LGUTopHeader({
               <div className="space-y-4">
                 <ProfileRow
                   icon={<User size={18} />}
-                  label="Full Name"
-                  value={adminName}
+                  label="Name"
+                  value={collectorName || "Collection Staff"}
                 />
 
                 <ProfileRow
                   icon={<Mail size={18} />}
                   label="Email Address"
-                  value={adminEmail || "No email found"}
+                  value={collectorEmail || "No email found"}
+                />
+
+                <ProfileRow
+                  icon={<Truck size={18} />}
+                  label="Team"
+                  value="MENRO Collection Team"
                 />
 
                 <ProfileRow
                   icon={<ShieldCheck size={18} />}
                   label="Role"
-                  value="LGU Admin"
-                />
-
-                <ProfileRow
-                  icon={<ShieldCheck size={18} />}
-                  label="Account Type"
-                  value="MENRO / LGU Administrator"
+                  value="Collection Staff"
                 />
               </div>
 
@@ -199,8 +234,9 @@ export default function LGUTopHeader({
                 </p>
 
                 <p className="text-xs text-green-700 mt-1">
-                  This account can manage waste reports, schedules, analytics,
-                  monthly printable reports, and user accounts.
+                  This account can view assigned pickup requests, update
+                  collection status, record actual collected waste, and review
+                  collection history.
                 </p>
               </div>
             </div>
@@ -227,62 +263,13 @@ function ProfileRow({ icon, label, value }) {
 }
 
 function getInitials(name) {
-  if (!name) return "MA";
+  if (!name) return "CS";
 
-  return name
+  return String(name)
     .split(" ")
     .filter(Boolean)
     .map((word) => word[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
-}
-
-function getPageTitle(activeSection) {
-  const titles = {
-    dashboard: "LGU Waste Management Dashboard",
-    reports: "Waste Collection Reports",
-    notifications: "Notifications",
-    schedule: "Collection Schedule",
-    analytics: "Waste Analytics",
-    monthly_reports: "Monthly Printable Reports",
-    map: "Collection Map",
-    leaderboard: "Barangay Leaderboard",
-    users: "Manage Users",
-  };
-
-  return titles[activeSection] || "LGU Dashboard";
-}
-
-function getPageSubtitle(activeSection) {
-  const subtitles = {
-    dashboard:
-      "Monitor municipal waste requests, collection performance, and real-time analytics.",
-
-    reports:
-      "Review and manage submitted waste collection requests from barangays.",
-
-    notifications:
-      "Track realtime alerts, request updates, and collection activities.",
-
-    schedule:
-      "Manage municipal garbage collection schedules and truck routes.",
-
-    analytics:
-      "Analyze waste trends, barangay performance, and collection statistics.",
-
-    monthly_reports:
-      "Generate printable monthly waste collection reports for MENRO documentation.",
-
-    map:
-      "View collection locations and assigned truck routes.",
-
-    leaderboard:
-      "Compare barangay waste performance and recycling participation.",
-
-    users:
-      "Manage barangay, collector, and administrator accounts.",
-  };
-
-  return subtitles[activeSection] || "";
 }

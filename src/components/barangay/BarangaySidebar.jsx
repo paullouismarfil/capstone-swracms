@@ -2,15 +2,31 @@ import {
   LayoutDashboard,
   FileText,
   CalendarDays,
-  BarChart3,
   Trophy,
-  Users,
   Bell,
   Recycle,
-  Printer,
+  ClipboardList,
 } from "lucide-react";
 
-export default function LGUSidebar({ activeSection, setActiveSection }) {
+function SidebarItem({ icon, label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition ${
+        active ? "bg-green-600 shadow-lg" : "text-green-100 hover:bg-green-900"
+      }`}
+    >
+      {icon}
+      <span className="text-sm font-medium">{label}</span>
+    </button>
+  );
+}
+
+export default function BarangaySidebar({
+  activeSection,
+  setActiveSection,
+  barangay,
+}) {
   return (
     <aside className="hidden lg:flex w-72 h-screen bg-green-950 text-white flex-col p-6">
       <div className="flex items-center gap-3 mb-10">
@@ -20,7 +36,7 @@ export default function LGUSidebar({ activeSection, setActiveSection }) {
 
         <div>
           <h1 className="text-2xl font-bold">SWRaCMS</h1>
-          <p className="text-xs text-green-200">MENRO / LGU Admin Portal</p>
+          <p className="text-xs text-green-200">Barangay User Portal</p>
         </div>
       </div>
 
@@ -34,9 +50,16 @@ export default function LGUSidebar({ activeSection, setActiveSection }) {
 
         <SidebarItem
           icon={<FileText size={20} />}
-          label="Waste Reports"
-          active={activeSection === "reports"}
-          onClick={() => setActiveSection("reports")}
+          label="Submit Request"
+          active={activeSection === "submit"}
+          onClick={() => setActiveSection("submit")}
+        />
+
+        <SidebarItem
+          icon={<ClipboardList size={20} />}
+          label="Track Requests"
+          active={activeSection === "track"}
+          onClick={() => setActiveSection("track")}
         />
 
         <SidebarItem
@@ -54,61 +77,19 @@ export default function LGUSidebar({ activeSection, setActiveSection }) {
         />
 
         <SidebarItem
-          icon={<BarChart3 size={20} />}
-          label="Waste Analytics"
-          active={activeSection === "analytics"}
-          onClick={() => setActiveSection("analytics")}
-        />
-
-        <SidebarItem
-          icon={<Printer size={20} />}
-          label="Monthly Reports"
-          active={activeSection === "monthly_reports"}
-          onClick={() => setActiveSection("monthly_reports")}
-        />
-
-        <SidebarItem
-          icon={<Recycle size={20} />}
-          label="Collection Map"
-          active={activeSection === "map"}
-          onClick={() => setActiveSection("map")}
-        />
-
-        <SidebarItem
           icon={<Trophy size={20} />}
           label="Leaderboard"
           active={activeSection === "leaderboard"}
           onClick={() => setActiveSection("leaderboard")}
         />
-
-        <SidebarItem
-          icon={<Users size={20} />}
-          label="Manage Users"
-          active={activeSection === "users"}
-          onClick={() => setActiveSection("users")}
-        />
       </nav>
 
       <div className="bg-green-900 rounded-2xl p-4 mt-auto mb-2">
-        <p className="text-sm font-semibold">System Status</p>
+        <p className="text-sm font-semibold">Barangay Account</p>
         <p className="text-xs text-green-200 mt-1">
-          Supabase database connection active.
+          {barangay || "Loading barangay..."}
         </p>
       </div>
     </aside>
-  );
-}
-
-function SidebarItem({ icon, label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition ${
-        active ? "bg-green-600 shadow-lg" : "text-green-100 hover:bg-green-900"
-      }`}
-    >
-      {icon}
-      <span className="text-sm font-medium">{label}</span>
-    </button>
   );
 }

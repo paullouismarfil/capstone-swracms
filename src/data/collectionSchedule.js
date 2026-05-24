@@ -321,7 +321,7 @@ export const allSibalomBarangays = [
 export function findBarangaySchedule(barangayName) {
   if (!barangayName) return null;
 
-  const normalized = barangayName.toLowerCase().trim();
+  const normalized = normalizeBarangayName(barangayName);
 
   if (
     normalized.includes("poblacion") ||
@@ -333,7 +333,8 @@ export function findBarangaySchedule(barangayName) {
   ) {
     return {
       group: "Poblacion and UA Special Collection",
-      description: "Special collection schedule for Poblacion and University of Antique area",
+      description:
+        "Special collection schedule for Poblacion and University of Antique area",
       time: "7:00 AM - 11:00 AM",
       wasteCategory: "Residual and Compostable Wastes",
       barangays: [
@@ -351,14 +352,14 @@ export function findBarangaySchedule(barangayName) {
 
   const schedule = collectionSchedule.find((group) =>
     group.barangays.some(
-      (barangay) => barangay.toLowerCase().trim() === normalized
+      (barangay) => normalizeBarangayName(barangay) === normalized
     )
   );
 
   if (schedule) return schedule;
 
   const inaccessible = inaccessibleBarangays.find(
-    (item) => item.barangay.toLowerCase().trim() === normalized
+    (item) => normalizeBarangayName(item.barangay) === normalized
   );
 
   if (inaccessible) {
@@ -373,4 +374,14 @@ export function findBarangaySchedule(barangayName) {
   }
 
   return null;
+}
+
+function normalizeBarangayName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/^barangay\s+/i, "")
+    .replace(/^brgy\.?\s+/i, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

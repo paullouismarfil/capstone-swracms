@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
+import { supabase } from "../../lib/supabase";
 
 const greenIcon = new L.Icon({
   iconUrl:
@@ -30,77 +32,73 @@ const blueIcon = new L.Icon({
 
 export default function CollectionMap({ requests = [] }) {
   const sibalomCenter = [10.7903, 122.0176];
+  const [barangayLocations, setBarangayLocations] = useState([]);
 
-  const barangayLocations = [
-    {
-      barangay: "Barangay Poblacion",
-      position: [10.7903, 122.0176],
-    },
-    {
-      barangay: "MENRO",
-      position: [10.7928, 122.0206],
-    },
-    {
-      barangay: "Barangay Villahermosa",
-      position: [10.7981, 122.0284],
-    },
-    {
-      barangay: "Barangay District 1",
-      position: [10.7868, 122.0153],
-    },
-    {
-      barangay: "Barangay District 2",
-      position: [10.7845, 122.0222],
-    },
-  ];
+  useEffect(() => {
+    fetchBarangayLocations();
+  }, []);
+
+  async function fetchBarangayLocations() {
+    const { data, error } = await supabase
+      .from("barangay_locations")
+      .select("*")
+      .order("barangay", { ascending: true });
+
+    if (error) {
+      console.error("Barangay locations fetch error:", error);
+      setBarangayLocations([]);
+      return;
+    }
+
+    setBarangayLocations(data || []);
+  }
 
   const mapPoints =
     requests.length > 0
-      ? requests.map((request, index) => {
-          const foundLocation =
-            barangayLocations.find(
-              (item) =>
-                item.barangay.toLowerCase() ===
-                String(request.barangay).toLowerCase()
-            ) || barangayLocations[index % barangayLocations.length];
+      ? requests.map((request) => {
+          const foundLocation = findBarangayLocation(
+            request.barangay,
+            barangayLocations
+          );
 
           return {
             id: request.id,
-            barangay: request.barangay || foundLocation.barangay,
+            barangay:
+              request.barangay ||
+              foundLocation?.barangay ||
+              "Unknown Barangay",
             status: request.status || "Pending",
             waste: request.waste_type || "Unspecified",
-            weight: request.estimated_weight || "N/A",
+            weight:
+              request.estimated_weight ||
+              request.actual_weight ||
+              request.weight ||
+              "N/A",
             collectionPoint: request.collection_point || "N/A",
-            position: foundLocation.position,
+            position: foundLocation
+              ? [foundLocation.latitude, foundLocation.longitude]
+              : sibalomCenter,
           };
         })
+      : barangayLocations.length > 0
+      ? barangayLocations.slice(0, 5).map((item) => ({
+          id: item.id,
+          barangay: item.barangay,
+          status: "Pending",
+          waste: "No request yet",
+          weight: "N/A",
+          collectionPoint: "Barangay collection point",
+          position: [item.latitude, item.longitude],
+        }))
       : [
           {
             id: 1,
             barangay: "Barangay Poblacion",
-            status: "Collected",
-            waste: "Plastic",
-            weight: "40 kg",
-            collectionPoint: "Barangay Hall",
-            position: [10.7903, 122.0176],
-          },
-          {
-            id: 2,
-            barangay: "Barangay District 2",
             status: "Pending",
-            waste: "Metal",
-            weight: "20 kg",
-            collectionPoint: "MRF Collection Point",
-            position: [10.7845, 122.0222],
-          },
-          {
-            id: 3,
-            barangay: "Barangay Villahermosa",
-            status: "Scheduled",
-            waste: "Biodegradable",
-            weight: "50 kg",
-            collectionPoint: "Designated Drop-off Area",
-            position: [10.7981, 122.0284],
+            waste: "No request yet",
+            weight: "N/A",
+            collectionPoint: "Barangay Hall",
+            position: sibalomCenter,
           },
         ];
 
@@ -125,7 +123,8 @@ export default function CollectionMap({ requests = [] }) {
       <div className="p-6 border-b">
         <h3 className="text-2xl font-bold">Collection Monitoring Map</h3>
         <p className="text-gray-500 mt-1">
-          Monitor barangay collection points, pickup requests, and current status.
+          Monitor barangay collection points, pickup requests, and current
+          status.
         </p>
       </div>
 
@@ -192,6 +191,24 @@ export default function CollectionMap({ requests = [] }) {
       </div>
     </div>
   );
+}
+
+function findBarangayLocation(barangayName, barangayLocations) {
+  const normalizedRequestBarangay = normalizeBarangayName(barangayName);
+
+  return barangayLocations.find(
+    (item) => normalizeBarangayName(item.barangay) === normalizedRequestBarangay
+  );
+}
+
+function normalizeBarangayName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/^barangay\s+/i, "")
+    .replace(/^brgy\.?\s+/i, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function MapStat({ label, value, color }) {

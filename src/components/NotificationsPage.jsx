@@ -7,6 +7,8 @@ export default function NotificationsPage({ role, userId }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!role && !userId) return;
+
     fetchNotifications();
 
     const channel = supabase
@@ -22,10 +24,14 @@ export default function NotificationsPage({ role, userId }) {
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [role, userId]);
 
   async function fetchNotifications() {
+    if (!role && !userId) return;
+
     setLoading(true);
 
     let query = supabase
@@ -43,29 +49,64 @@ export default function NotificationsPage({ role, userId }) {
 
     const { data, error } = await query;
 
-    if (!error) setNotifications(data || []);
+    if (error) {
+      console.error("Notifications page fetch error:", error);
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    setNotifications(data || []);
     setLoading(false);
   }
 
   async function markAsRead(id) {
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    if (!id) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Mark as read error:", error);
+      return;
+    }
+
     fetchNotifications();
   }
 
   async function markAllAsRead() {
     const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+
     if (unreadIds.length === 0) return;
 
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .in("id", unreadIds);
+
+    if (error) {
+      console.error("Mark all as read error:", error);
+      return;
+    }
 
     fetchNotifications();
   }
 
   async function deleteNotification(id) {
-    await supabase.from("notifications").delete().eq("id", id);
+    if (!id) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Delete notification error:", error);
+      return;
+    }
+
     fetchNotifications();
   }
 
@@ -82,6 +123,7 @@ export default function NotificationsPage({ role, userId }) {
 
             <div>
               <h3 className="text-2xl font-bold">Notifications</h3>
+
               <p className="text-sm text-gray-500">
                 View system alerts, request updates, and collection activities.
               </p>
@@ -91,7 +133,8 @@ export default function NotificationsPage({ role, userId }) {
           <button
             type="button"
             onClick={markAllAsRead}
-            className="bg-green-700 text-white px-5 py-3 rounded-2xl font-semibold text-sm"
+            disabled={unreadCount === 0}
+            className="bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-5 py-3 rounded-2xl font-semibold text-sm"
           >
             Mark all as read
           </button>
@@ -107,6 +150,7 @@ export default function NotificationsPage({ role, userId }) {
       <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
         <div className="p-6 border-b">
           <h3 className="text-xl font-bold">Notification List</h3>
+
           <p className="text-sm text-gray-500">
             Click a notification to mark it as read.
           </p>
@@ -141,12 +185,18 @@ export default function NotificationsPage({ role, userId }) {
                       : "bg-green-100 text-green-700"
                   }`}
                 >
-                  {item.is_read ? <CheckCircle size={22} /> : <Clock size={22} />}
+                  {item.is_read ? (
+                    <CheckCircle size={22} />
+                  ) : (
+                    <Clock size={22} />
+                  )}
                 </div>
 
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="font-bold text-gray-900">{item.title}</h4>
+                    <h4 className="font-bold text-gray-900">
+                      {item.title || "System Notification"}
+                    </h4>
 
                     {!item.is_read && (
                       <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
@@ -161,7 +211,9 @@ export default function NotificationsPage({ role, userId }) {
                     )}
                   </div>
 
-                  <p className="text-sm text-gray-600 mt-1">{item.message}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {item.message || "No message available."}
+                  </p>
 
                   <p className="text-xs text-gray-400 mt-2">
                     {formatDateTime(item.created_at)}

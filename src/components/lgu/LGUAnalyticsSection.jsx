@@ -16,7 +16,7 @@ export default function LGUAnalyticsSection({ analytics, records }) {
         <StatCard
           title="Recyclable Waste"
           value={`${analytics.recyclablePercent}%`}
-          note="Plastic, metal, glass, recyclable"
+          note="Recyclable, plastic, metal, and glass"
           icon={<Recycle size={26} />}
           color="blue"
         />
@@ -129,9 +129,18 @@ export function LGUAnalyticsSummaryCard({ analytics }) {
 
       <div className="space-y-4">
         <MiniBadge label="Total Actual Waste" value={`${analytics.totalKg} kg`} />
-        <MiniBadge label="Recyclable Waste" value={`${analytics.recyclableKg} kg`} />
-        <MiniBadge label="Non-Recyclable Waste" value={`${analytics.nonRecyclableKg} kg`} />
-        <MiniBadge label="Recyclable Percentage" value={`${analytics.recyclablePercent}%`} />
+        <MiniBadge
+          label="Recyclable Waste"
+          value={`${analytics.recyclableKg} kg`}
+        />
+        <MiniBadge
+          label="Non-Recyclable Waste"
+          value={`${analytics.nonRecyclableKg} kg`}
+        />
+        <MiniBadge
+          label="Recyclable Percentage"
+          value={`${analytics.recyclablePercent}%`}
+        />
       </div>
     </div>
   );
@@ -342,8 +351,6 @@ function isRecyclable(type) {
     "plastic",
     "metal",
     "glass",
-    "bottle",
-    "carton",
   ];
 
   const lower = String(type || "").toLowerCase();

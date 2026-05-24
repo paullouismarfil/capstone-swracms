@@ -1,4 +1,4 @@
-import { Eye } from "lucide-react";
+import { Eye, Lock } from "lucide-react";
 
 export default function ReportsTable({
   reports,
@@ -8,7 +8,11 @@ export default function ReportsTable({
   onStatusChange,
 }) {
   return (
-    <div className={`${full ? "" : "xl:col-span-2"} bg-white rounded-3xl shadow-sm border overflow-hidden`}>
+    <div
+      className={`${
+        full ? "" : "xl:col-span-2"
+      } bg-white rounded-3xl shadow-sm border overflow-hidden`}
+    >
       <div className="p-6 border-b flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold">Waste Reports</h3>
@@ -60,26 +64,34 @@ export default function ReportsTable({
             {!loading &&
               reports.map((report) => {
                 const photos = report.image_urls || [];
+                const isCollected = report.status === "Collected";
 
                 return (
                   <tr key={report.id} className="border-t hover:bg-gray-50">
                     <td className="p-4 font-semibold text-green-700">
                       CR-{String(report.id).padStart(3, "0")}
                     </td>
+
                     <td className="p-4 font-semibold">{report.barangay}</td>
+
                     <td className="p-4">{report.request_title}</td>
+
                     <td className="p-4 text-gray-600">{report.waste_type}</td>
+
                     <td className="p-4">
                       <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
                         {report.schedule_group || "N/A"}
                       </span>
                     </td>
+
                     <td className="p-4 text-gray-600">
                       {report.allowed_waste_category || "N/A"}
                     </td>
+
                     <td className="p-4 font-semibold">
                       {formatKg(report.estimated_weight)}
                     </td>
+
                     <td className="p-4">
                       {photos.length > 0 ? (
                         <button
@@ -99,14 +111,17 @@ export default function ReportsTable({
                         <span className="text-gray-400 text-sm">No photo</span>
                       )}
                     </td>
+
                     <td className="p-4 text-gray-500">
                       {formatDate(report.created_at)}
                     </td>
+
                     <td className="p-4">
                       <StatusBadge status={report.status} />
                     </td>
+
                     <td className="p-4">
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap items-center">
                         <button
                           onClick={() => onView(report)}
                           className="text-green-700 font-semibold text-sm flex items-center gap-1"
@@ -115,31 +130,46 @@ export default function ReportsTable({
                           Review
                         </button>
 
-                        {report.status === "Pending" && (
-                          <button
-                            onClick={() => onStatusChange(report.id, "Scheduled")}
-                            className="text-blue-700 font-semibold text-sm"
-                          >
-                            Schedule
-                          </button>
-                        )}
+                        {isCollected ? (
+                          <span className="inline-flex items-center gap-1 text-gray-500 font-semibold text-sm">
+                            <Lock size={14} />
+                            Finalized
+                          </span>
+                        ) : (
+                          <>
+                            {report.status === "Pending" && (
+                              <button
+                                onClick={() =>
+                                  onStatusChange(report.id, "Scheduled")
+                                }
+                                className="text-blue-700 font-semibold text-sm"
+                              >
+                                Schedule
+                              </button>
+                            )}
 
-                        {report.status === "Scheduled" && (
-                          <button
-                            onClick={() => onStatusChange(report.id, "Collected")}
-                            className="text-green-700 font-semibold text-sm"
-                          >
-                            Mark Collected
-                          </button>
-                        )}
+                            {report.status === "Scheduled" && (
+                              <button
+                                onClick={() =>
+                                  onStatusChange(report.id, "Collected")
+                                }
+                                className="text-green-700 font-semibold text-sm"
+                              >
+                                Mark Collected
+                              </button>
+                            )}
 
-                        {report.status !== "Missed" && (
-                          <button
-                            onClick={() => onStatusChange(report.id, "Missed")}
-                            className="text-red-600 font-semibold text-sm"
-                          >
-                            Missed
-                          </button>
+                            {report.status !== "Missed" && (
+                              <button
+                                onClick={() =>
+                                  onStatusChange(report.id, "Missed")
+                                }
+                                className="text-red-600 font-semibold text-sm"
+                              >
+                                Missed
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

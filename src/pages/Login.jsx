@@ -181,153 +181,177 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center px-4 py-4 overflow-hidden relative"
+      className="min-h-screen w-full bg-cover bg-center bg-no-repeat relative overflow-x-hidden"
       style={{
         backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22)), url('/logo.png')",
+          "linear-gradient(rgba(255,255,255,0.28), rgba(255,255,255,0.28)), url('/logo.png')",
       }}
     >
-      <div className="w-full max-w-[1350px] grid grid-cols-1 lg:grid-cols-2 items-center gap-8">
-        <div className="hidden lg:flex flex-col justify-center h-full pl-8">
-          <div className="flex items-center gap-5 mb-7">
-            <Recycle className="text-green-700" size={68} />
+      <div className="min-h-screen w-full flex items-center justify-center px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <div className="w-full max-w-[1280px] grid grid-cols-1 lg:grid-cols-2 items-center gap-6 lg:gap-10">
+          <div className="hidden lg:flex flex-col justify-center h-full pl-2 xl:pl-8">
+            <div className="flex items-center gap-5 mb-7">
+              <Recycle className="text-green-700 shrink-0" size={64} />
 
-            <div>
-              <h1 className="text-[58px] font-semibold leading-none text-black tracking-tight">
-                SWRaCMS
-              </h1>
+              <div>
+                <h1 className="text-5xl xl:text-[58px] font-semibold leading-none text-black tracking-tight">
+                  SWRaCMS
+                </h1>
 
-              <p className="mt-4 text-[18px] leading-relaxed text-black/80">
-                Smart Waste Recording and <br />
-                Collection Management System <br />
-                for the Barangays of Sibalom
+                <p className="mt-4 text-base xl:text-[18px] leading-relaxed text-black/80">
+                  Smart Waste Recording and <br />
+                  Collection Management System <br />
+                  for the Barangays of Sibalom
+                </p>
+              </div>
+            </div>
+
+            <div className="w-20 h-[3px] bg-green-600 mb-8"></div>
+
+            <p className="text-2xl xl:text-[26px] font-light leading-[1.45] text-black max-w-[620px]">
+              A digital solution for efficient <br />
+              waste reporting, collection <br />
+              management, monitoring, <br />
+              and a cleaner community.
+            </p>
+
+            <div className="mt-10 space-y-5">
+              <Feature
+                icon={<ClipboardCheck size={24} />}
+                title="Report"
+                desc="Waste Issues"
+              />
+
+              <Feature
+                icon={<CalendarDays size={24} />}
+                title="Manage"
+                desc="Collections"
+              />
+
+              <Feature
+                icon={<BarChart3 size={24} />}
+                title="Monitor"
+                desc="Performance"
+              />
+            </div>
+          </div>
+
+          <div className="w-full max-w-[650px] bg-white/95 backdrop-blur-xl rounded-[28px] sm:rounded-[36px] shadow-2xl px-5 sm:px-7 lg:px-8 py-6 sm:py-8 mx-auto">
+            <div className="text-center">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 sm:mb-5">
+                <Leaf className="text-green-700" size={44} />
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold text-black leading-tight">
+                Welcome to <span className="text-green-700">SWRaCMS!</span>
+              </h2>
+
+              <div className="flex items-center justify-center gap-3 my-4">
+                <div className="w-14 sm:w-20 h-[2px] bg-green-500"></div>
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <div className="w-14 sm:w-20 h-[2px] bg-green-500"></div>
+              </div>
+
+              <p className="text-sm sm:text-base lg:text-[18px] text-gray-500 mb-6 sm:mb-7">
+                Please select your role to continue.
               </p>
             </div>
-          </div>
 
-          <div className="w-20 h-[3px] bg-green-600 mb-8"></div>
+            <div className="space-y-3 sm:space-y-4">
+              {roles.map((role) => (
+                <button
+                  key={role.title}
+                  onClick={() => openLogin(role)}
+                  className={`w-full border ${colors[role.color].border} ${colors[role.color].bg}
+                  rounded-[22px] sm:rounded-[24px] p-4 flex items-center justify-between gap-3
+                  hover:scale-[1.01] hover:shadow-xl transition duration-300`}
+                >
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div
+                      className={`w-14 h-14 sm:w-20 sm:h-20 rounded-[18px] sm:rounded-[22px] ${colors[role.color].icon}
+                      flex items-center justify-center text-white shadow-lg shrink-0`}
+                    >
+                      {role.icon}
+                    </div>
 
-          <p className="text-[26px] font-light leading-[1.45] text-black max-w-[620px]">
-            A digital solution for efficient <br />
-            waste reporting, collection <br />
-            management, monitoring, <br />
-            and a cleaner community.
-          </p>
+                    <div className="text-left min-w-0">
+                      <h3
+                        className={`text-xl sm:text-2xl lg:text-[28px] font-semibold ${colors[role.color].text}`}
+                      >
+                        {role.title}
+                      </h3>
 
-          <div className="mt-10 space-y-5">
-            <Feature icon={<ClipboardCheck size={24} />} title="Report" desc="Waste Issues" />
-            <Feature icon={<CalendarDays size={24} />} title="Manage" desc="Collections" />
-            <Feature icon={<BarChart3 size={24} />} title="Monitor" desc="Performance" />
-          </div>
-        </div>
-
-        <div className="w-full max-w-[650px] bg-white/95 backdrop-blur-xl rounded-[36px] shadow-2xl px-8 py-8 mx-auto">
-          <div className="text-center">
-            <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
-              <Leaf className="text-green-700" size={50} />
-            </div>
-
-            <h2 className="text-[44px] font-bold text-black leading-tight">
-              Welcome to <span className="text-green-700">SWRaCMS!</span>
-            </h2>
-
-            <div className="flex items-center justify-center gap-3 my-4">
-              <div className="w-20 h-[2px] bg-green-500"></div>
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <div className="w-20 h-[2px] bg-green-500"></div>
-            </div>
-
-            <p className="text-[18px] text-gray-500 mb-7">
-              Please select your role to continue.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {roles.map((role) => (
-              <button
-                key={role.title}
-                onClick={() => openLogin(role)}
-                className={`w-full border ${colors[role.color].border} ${colors[role.color].bg}
-                rounded-[24px] p-4 flex items-center justify-between
-                hover:scale-[1.01] hover:shadow-xl transition duration-300`}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-20 h-20 rounded-[22px] ${colors[role.color].icon}
-                    flex items-center justify-center text-white shadow-lg`}
-                  >
-                    {role.icon}
+                      <p className="text-xs sm:text-sm lg:text-[15px] leading-relaxed text-black/70 max-w-[360px] mt-1">
+                        {role.desc}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="text-left">
-                    <h3 className={`text-[28px] font-semibold ${colors[role.color].text}`}>
-                      {role.title}
-                    </h3>
+                  <ChevronRight
+                    className={`${colors[role.color].text} shrink-0`}
+                    size={32}
+                  />
+                </button>
+              ))}
+            </div>
 
-                    <p className="text-[15px] leading-relaxed text-black/70 max-w-[360px] mt-1">
-                      {role.desc}
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-center gap-5 my-6 sm:my-7">
+              <div className="flex-1 h-[1px] bg-gray-300"></div>
+              <Leaf className="text-green-600" size={24} />
+              <div className="flex-1 h-[1px] bg-gray-300"></div>
+            </div>
 
-                <ChevronRight className={colors[role.color].text} size={38} />
-              </button>
-            ))}
-          </div>
+            <div className="text-center text-sm sm:text-base lg:text-[18px] text-gray-700">
+              <p className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+                <ShieldCheck className="text-green-700" size={21} />
+                Secure
+                <span className="text-green-600">•</span>
+                Transparent
+                <span className="text-green-600">•</span>
+                Efficient
+              </p>
 
-          <div className="flex items-center gap-5 my-7">
-            <div className="flex-1 h-[1px] bg-gray-300"></div>
-            <Leaf className="text-green-600" size={26} />
-            <div className="flex-1 h-[1px] bg-gray-300"></div>
-          </div>
+              <p className="text-gray-500 mt-2 text-xs sm:text-sm lg:text-[16px]">
+                Working together for a cleaner Sibalom.
+              </p>
+            </div>
 
-          <div className="text-center text-[18px] text-gray-700">
-            <p className="flex items-center justify-center gap-3 flex-wrap">
-              <ShieldCheck className="text-green-700" size={22} />
-              Secure
-              <span className="text-green-600">•</span>
-              Transparent
-              <span className="text-green-600">•</span>
-              Efficient
-            </p>
-
-            <p className="text-gray-500 mt-2 text-[16px]">
-              Working together for a cleaner Sibalom.
+            <p className="text-center text-xs text-gray-400 mt-6">
+              © 2026 SWRaCMS. All rights reserved. <br />
+              Develop by: Paul Louis Marfil, Engelica Getalado, Kenan Matandac, Harvey Daypuyart and Rosalyn Brianson.
             </p>
           </div>
         </div>
       </div>
 
       {selectedRole && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-[520px] p-7 relative">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-[28px] sm:rounded-[32px] shadow-2xl w-full max-w-[520px] p-5 sm:p-7 relative my-6">
             <button
               onClick={closeLogin}
-              className="absolute top-5 right-5 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+              className="absolute top-4 sm:top-5 right-4 sm:right-5 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
             >
               <X size={20} />
             </button>
 
             <div className="text-center mb-6">
               <div
-                className={`w-20 h-20 mx-auto rounded-2xl ${colors[selectedRole.color].icon}
+                className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-2xl ${colors[selectedRole.color].icon}
                 flex items-center justify-center text-white shadow-lg mb-4`}
               >
                 {selectedRole.icon}
               </div>
 
-              <h3 className="text-3xl font-bold text-black">
+              <h3 className="text-2xl sm:text-3xl font-bold text-black">
                 {selectedRole.title} Login
               </h3>
 
-              <p className="text-gray-500 mt-2">
+              <p className="text-sm sm:text-base text-gray-500 mt-2">
                 Use an authorized account registered by the LGU Admin.
               </p>
             </div>
 
             <div className="space-y-3">
-
-              {/* GOOGLE BUTTON */}
               <button
                 onClick={() => handleOAuthLogin("google")}
                 className="w-full border border-gray-300 bg-white rounded-2xl py-3 px-4 font-semibold hover:bg-gray-50 flex items-center justify-center gap-3 transition"
@@ -338,12 +362,9 @@ export default function Login() {
                   className="w-5 h-5"
                 />
 
-                <span className="text-gray-700">
-                  Continue with Google
-                </span>
+                <span className="text-gray-700">Continue with Google</span>
               </button>
 
-              {/* GITHUB BUTTON */}
               <button
                 onClick={() => handleOAuthLogin("github")}
                 className="w-full bg-black text-white rounded-2xl py-3 px-4 font-semibold hover:bg-gray-900 flex items-center justify-center gap-3 transition"
@@ -354,11 +375,8 @@ export default function Login() {
                   className="w-5 h-5 invert"
                 />
 
-                <span>
-                  Continue with GitHub
-                </span>
+                <span>Continue with GitHub</span>
               </button>
-
             </div>
 
             <div className="flex items-center gap-4 my-6">
@@ -373,7 +391,7 @@ export default function Login() {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-gray-300 rounded-2xl px-5 py-4 outline-none focus:border-green-500"
+                className="w-full border border-gray-300 rounded-2xl px-5 py-3 sm:py-4 outline-none focus:border-green-500"
               />
 
               <input
@@ -381,7 +399,7 @@ export default function Login() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-2xl px-5 py-4 outline-none focus:border-green-500"
+                className="w-full border border-gray-300 rounded-2xl px-5 py-3 sm:py-4 outline-none focus:border-green-500"
               />
 
               {error && (
@@ -393,7 +411,7 @@ export default function Login() {
               <button
                 onClick={handleEmailLogin}
                 disabled={loading}
-                className="w-full bg-green-700 hover:bg-green-800 disabled:bg-gray-400 text-white rounded-2xl py-4 text-lg font-semibold transition"
+                className="w-full bg-green-700 hover:bg-green-800 disabled:bg-gray-400 text-white rounded-2xl py-3 sm:py-4 text-base sm:text-lg font-semibold transition"
               >
                 {loading ? "Signing In..." : "Sign In"}
               </button>
@@ -412,7 +430,7 @@ export default function Login() {
 function Feature({ icon, title, desc }) {
   return (
     <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-green-700 shadow">
+      <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-green-700 shadow shrink-0">
         {icon}
       </div>
 
