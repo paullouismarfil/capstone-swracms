@@ -13,6 +13,8 @@ import {
   Leaf,
   ChevronRight,
   X,
+  Mail,
+  Send,
 } from "lucide-react";
 
 export default function Login() {
@@ -21,8 +23,15 @@ export default function Login() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [showAccessRequest, setShowAccessRequest] = useState(false);
+  const [requestEmail, setRequestEmail] = useState("");
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestMessageType, setRequestMessageType] = useState("");
 
   const roles = [
     {
@@ -97,17 +106,71 @@ export default function Login() {
     setError("");
   }
 
+  function openAccessRequest() {
+    setShowAccessRequest(true);
+    setRequestEmail("");
+    setRequestMessage("");
+    setRequestMessageType("");
+  }
+
+  function closeAccessRequest() {
+    if (requestLoading) return;
+
+    setShowAccessRequest(false);
+    setRequestEmail("");
+    setRequestMessage("");
+    setRequestMessageType("");
+  }
+
   function goToPortal(role) {
     if (role === "lgu_admin") navigate("/lgu");
     if (role === "barangay_user") navigate("/barangay");
     if (role === "collection_staff") navigate("/collector");
   }
 
+  async function updateLoginMetadata(normalizedEmail, profile) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authUser = sessionData?.session?.user;
+
+    if (!authUser) return;
+
+    const provider =
+      authUser?.app_metadata?.provider ||
+      authUser?.identities?.[0]?.provider ||
+      "email";
+
+    const avatarUrl =
+      authUser?.user_metadata?.avatar_url ||
+      authUser?.user_metadata?.picture ||
+      profile?.avatar_url ||
+      null;
+
+    const updatePayload = {
+      provider,
+      last_login: new Date().toISOString(),
+    };
+
+    if (avatarUrl) {
+      updatePayload.avatar_url = avatarUrl;
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("email", normalizedEmail);
+
+    if (error) {
+      console.error("Profile metadata update error:", error);
+    }
+  }
+
   async function verifyUser(userEmail, requiredRole) {
+    const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
-      .eq("email", userEmail)
+      .eq("email", normalizedEmail)
       .single();
 
     if (profileError || !profile) {
@@ -131,6 +194,8 @@ export default function Login() {
       return;
     }
 
+    await updateLoginMetadata(normalizedEmail, profile);
+
     localStorage.removeItem("pendingRole");
     goToPortal(profile.role);
   }
@@ -145,8 +210,15 @@ export default function Login() {
         return;
       }
 
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (!normalizedEmail || !password) {
+        setError("Please enter your email and password.");
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
@@ -156,7 +228,8 @@ export default function Login() {
       }
 
       await verifyUser(data.user.email, selectedRole.role);
-    } catch {
+    } catch (error) {
+      console.error("Email login error:", error);
       setError("Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -177,6 +250,96 @@ export default function Login() {
         redirectTo: window.location.origin,
       },
     });
+  }
+
+  async function submitAccessRequest() {
+    setRequestMessage("");
+    setRequestMessageType("");
+
+    const normalizedEmail = requestEmail.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setRequestMessage("Please enter your email address.");
+      setRequestMessageType("error");
+      return;
+    }
+
+    if (!normalizedEmail.includes("@")) {
+      setRequestMessage("Please enter a valid email address.");
+      setRequestMessageType("error");
+      return;
+    }
+
+    setRequestLoading(true);
+
+    const { data: existingRequest, error: checkError } = await supabase
+      .from("access_requests")
+      .select("id, email, status")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error("Check access request error:", checkError);
+      setRequestMessage("Unable to check your request. Please try again.");
+      setRequestMessageType("error");
+      setRequestLoading(false);
+      return;
+    }
+
+    if (existingRequest) {
+      if (existingRequest.status === "pending") {
+        setRequestMessage(
+          "You already submitted an access request. Please wait for LGU Admin approval."
+        );
+      } else if (existingRequest.status === "approved") {
+        setRequestMessage(
+          "Your access request has already been approved. Please log in using your registered email."
+        );
+      } else if (existingRequest.status === "rejected") {
+        setRequestMessage(
+          "Your access request was rejected. Please contact the LGU Admin for assistance."
+        );
+      } else {
+        setRequestMessage("This email already has an access request record.");
+      }
+
+      setRequestMessageType("error");
+      setRequestLoading(false);
+      return;
+    }
+
+    const payload = {
+      email: normalizedEmail,
+      status: "pending",
+    };
+
+    const { error } = await supabase.from("access_requests").insert(payload);
+
+    if (error) {
+      console.error("Access request error:", error);
+
+      if (error.code === "23505") {
+        setRequestMessage(
+          "You already submitted an access request. Please wait for LGU Admin approval."
+        );
+      } else {
+        setRequestMessage(
+          error.message ||
+            "Failed to submit access request. Please contact the LGU Admin."
+        );
+      }
+
+      setRequestMessageType("error");
+      setRequestLoading(false);
+      return;
+    }
+
+    setRequestMessage(
+      "Access request submitted successfully. Please wait for LGU Admin approval."
+    );
+    setRequestMessageType("success");
+    setRequestLoading(false);
+    setRequestEmail("");
   }
 
   return (
@@ -295,6 +458,15 @@ export default function Login() {
               ))}
             </div>
 
+            <button
+              type="button"
+              onClick={openAccessRequest}
+              className="mt-5 w-full border border-green-200 bg-white text-green-700 rounded-2xl py-3 px-4 font-semibold hover:bg-green-50 flex items-center justify-center gap-2 transition"
+            >
+              <Mail size={18} />
+              Request Access
+            </button>
+
             <div className="flex items-center gap-5 my-6 sm:my-7">
               <div className="flex-1 h-[1px] bg-gray-300"></div>
               <Leaf className="text-green-600" size={24} />
@@ -318,7 +490,8 @@ export default function Login() {
 
             <p className="text-center text-xs text-gray-400 mt-6">
               © 2026 SWRaCMS. All rights reserved. <br />
-              Develop by: Paul Louis Marfil, Engelica Getalado, Kenan Matandac, Harvey Daypuyart and Rosalyn Brianson.
+              Develop by: Paul Louis Marfil, Engelica Getalado, Kenan Matandac,
+              Harvey Daypuyart and Rosalyn Brianson.
             </p>
           </div>
         </div>
@@ -419,6 +592,73 @@ export default function Login() {
 
             <p className="text-center text-xs text-gray-400 mt-5">
               If your account is not yet approved, please contact the LGU Admin.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showAccessRequest && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-[28px] sm:rounded-[32px] shadow-2xl w-full max-w-[500px] p-5 sm:p-7 relative my-6">
+            <button
+              type="button"
+              onClick={closeAccessRequest}
+              disabled={requestLoading}
+              className="absolute top-4 sm:top-5 right-4 sm:right-5 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 disabled:opacity-60"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-2xl bg-green-700 flex items-center justify-center text-white shadow-lg mb-4">
+                <Mail size={34} />
+              </div>
+
+              <h3 className="text-2xl sm:text-3xl font-bold text-black">
+                Request System Access
+              </h3>
+
+              <p className="text-sm sm:text-base text-gray-500 mt-2">
+                Enter your email address. The LGU Admin will review your
+                request before granting access.
+              </p>
+            </div>
+
+            {requestMessage && (
+              <div
+                className={`mb-4 px-4 py-3 rounded-2xl text-sm ${
+                  requestMessageType === "success"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {requestMessage}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <input
+                type="email"
+                placeholder="Enter your email address"
+                value={requestEmail}
+                onChange={(e) => setRequestEmail(e.target.value)}
+                className="w-full border border-gray-300 rounded-2xl px-5 py-3 outline-none focus:border-green-500"
+              />
+
+              <button
+                type="button"
+                onClick={submitAccessRequest}
+                disabled={requestLoading}
+                className="w-full bg-green-700 hover:bg-green-800 disabled:bg-gray-400 text-white rounded-2xl py-3 text-base font-semibold transition flex items-center justify-center gap-2"
+              >
+                <Send size={18} />
+                {requestLoading ? "Submitting..." : "Submit Access Request"}
+              </button>
+            </div>
+
+            <p className="text-center text-xs text-gray-400 mt-5">
+              Submitting a request does not automatically create an account.
+              The LGU Admin must approve and register your email first.
             </p>
           </div>
         </div>

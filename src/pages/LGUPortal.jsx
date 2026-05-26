@@ -219,8 +219,9 @@ export default function LGUPortal() {
         {
           role: "collector",
           title: "New Pickup Schedule",
-          message: `${requestData?.barangay || "Barangay"
-            } request is now scheduled for collection.`,
+          message: `${
+            requestData?.barangay || "Barangay"
+          } request is now scheduled for collection.`,
           type: "collection_schedule",
           is_read: false,
         },
@@ -232,8 +233,9 @@ export default function LGUPortal() {
         {
           role: "lgu_admin",
           title: "Collection Completed",
-          message: `${requestData?.barangay || "Barangay"
-            } request has been marked as collected.`,
+          message: `${
+            requestData?.barangay || "Barangay"
+          } request has been marked as collected.`,
           type: "collection_complete",
           is_read: false,
         },
@@ -266,6 +268,8 @@ export default function LGUPortal() {
     adminProfile?.username ||
     "MENRO Admin";
 
+  const adminAvatar = adminProfile?.avatar_url || "";
+
   return (
     <div className="min-h-screen bg-[#f4f7f3] text-gray-900 lg:flex">
       <LGUSidebar
@@ -286,6 +290,7 @@ export default function LGUPortal() {
           showBell={activeSection === "dashboard"}
           adminName={adminName}
           adminEmail={adminEmail}
+          adminAvatar={adminAvatar}
           onLogout={handleLogout}
           onChangePassword={handleChangePassword}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
@@ -412,9 +417,15 @@ function parseKg(value) {
   return Number(number) || 0;
 }
 
-function normalizeWasteType(type) {
-  if (!type) return "Unspecified";
-  return String(type).trim();
+function splitWasteTypes(type) {
+  if (!type) return ["Unspecified"];
+
+  const types = String(type)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return types.length > 0 ? types : ["Unspecified"];
 }
 
 function isRecyclable(type) {
@@ -436,18 +447,22 @@ function calculateWasteAnalytics(records) {
 
   records.forEach((record) => {
     const kg = parseKg(record.actual_weight);
-    const wasteType = normalizeWasteType(record.waste_type);
+    const wasteTypes = splitWasteTypes(record.waste_type);
+    const kgPerType = wasteTypes.length > 0 ? kg / wasteTypes.length : kg;
     const barangay = record.route_name || "Unspecified";
 
-    wasteMap[wasteType] = (wasteMap[wasteType] || 0) + kg;
+    wasteTypes.forEach((wasteType) => {
+      wasteMap[wasteType] = (wasteMap[wasteType] || 0) + kgPerType;
+    });
+
     barangayMap[barangay] = (barangayMap[barangay] || 0) + kg;
 
     const date = record.collected_date || record.created_at;
     const month = date
       ? new Date(date).toLocaleDateString("en-PH", {
-        month: "long",
-        year: "numeric",
-      })
+          month: "long",
+          year: "numeric",
+        })
       : "Unspecified";
 
     monthMap[month] = (monthMap[month] || 0) + kg;

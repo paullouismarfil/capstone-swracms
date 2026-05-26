@@ -9,14 +9,19 @@ import {
   Phone,
   MapPin,
   Lock,
+  Copy,
+  UserPlus,
+  Ban,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 export default function LGUUsersSection() {
   const [users, setUsers] = useState([]);
+  const [accessRequests, setAccessRequests] = useState([]);
   const [barangayLocations, setBarangayLocations] = useState([]);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -36,6 +41,7 @@ export default function LGUUsersSection() {
   useEffect(() => {
     loadCurrentUser();
     fetchUsers();
+    fetchAccessRequests();
     fetchBarangayLocations();
   }, []);
 
@@ -66,6 +72,26 @@ export default function LGUUsersSection() {
 
     setUsers(data || []);
     setLoading(false);
+  }
+
+  async function fetchAccessRequests() {
+    setLoadingAccessRequests(true);
+
+    const { data, error } = await supabase
+      .from("access_requests")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Fetch access requests error:", error);
+      setAccessRequests([]);
+      setLoadingAccessRequests(false);
+      return;
+    }
+
+    setAccessRequests(data || []);
+    setLoadingAccessRequests(false);
   }
 
   async function fetchBarangayLocations() {
@@ -116,12 +142,12 @@ export default function LGUUsersSection() {
       barangay: selectedBarangay,
       latitude:
         selectedLocation?.latitude !== null &&
-        selectedLocation?.latitude !== undefined
+          selectedLocation?.latitude !== undefined
           ? String(selectedLocation.latitude)
           : "",
       longitude:
         selectedLocation?.longitude !== null &&
-        selectedLocation?.longitude !== undefined
+          selectedLocation?.longitude !== undefined
           ? String(selectedLocation.longitude)
           : "",
     }));
@@ -150,6 +176,98 @@ export default function LGUUsersSection() {
     resetForm();
   }
 
+  function handleUseRequestEmail(requestEmail) {
+    setFormData((prev) => ({
+      ...prev,
+      email: String(requestEmail || "").trim().toLowerCase(),
+    }));
+
+    setShowAddModal(true);
+  }
+
+  async function copyEmail(email) {
+    try {
+      await navigator.clipboard.writeText(email);
+      alert("Email copied: " + email);
+    } catch {
+      alert("Copy failed. Please copy manually: " + email);
+    }
+  }
+
+  async function rejectAccessRequest(request) {
+    const confirmed = window.confirm(
+      `Reject access request from ${request.email}?`
+    );
+
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("access_requests")
+      .update({ status: "rejected" })
+      .eq("id", request.id);
+
+    if (error) {
+      console.error(error);
+      alert(error.message || "Failed to reject access request.");
+      return;
+    }
+
+    fetchAccessRequests();
+  }
+
+  async function markAccessRequestApproved(email) {
+    if (!email) return;
+
+    const { error } = await supabase
+      .from("access_requests")
+      .update({ status: "approved" })
+      .eq("email", String(email).trim().toLowerCase());
+
+    if (error) {
+      console.error("Approve access request error:", error);
+      return;
+    }
+
+    fetchAccessRequests();
+  }
+
+  async function sendRegistrationEmail(profilePayload) {
+    const { data, error } = await supabase.functions.invoke(
+      "send-registration-email",
+      {
+        body: {
+          email: profilePayload.email,
+          full_name: profilePayload.full_name,
+          role: profilePayload.role,
+          barangay: profilePayload.barangay,
+        },
+      }
+    );
+
+    if (error) {
+      console.error("Send registration email error:", error);
+      return {
+        success: false,
+        message:
+          error.message ||
+          "User was saved, but the registration email was not sent.",
+      };
+    }
+
+    if (data?.error) {
+      console.error("Send registration email function error:", data.error);
+      return {
+        success: false,
+        message: "User was saved, but the registration email was not sent.",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Registration email sent successfully.",
+    };
+  }
+
   function handleAddUser(e) {
     e.preventDefault();
 
@@ -175,8 +293,10 @@ export default function LGUUsersSection() {
 
     setSaving(true);
 
+    const normalizedEmail = formData.email.trim().toLowerCase();
+
     const profilePayload = {
-      email: formData.email.trim().toLowerCase(),
+      email: normalizedEmail,
       full_name: formData.full_name.trim(),
       role: formData.role,
       barangay:
@@ -196,15 +316,26 @@ export default function LGUUsersSection() {
       console.error("Save user profile error:", profileError);
       alert(
         profileError.message ||
-          "Failed to save user profile. Check profiles table or RLS."
+        "Failed to save user profile. Check profiles table or RLS."
       );
       return;
     }
 
+    await markAccessRequestApproved(normalizedEmail);
+
+    const emailResult = await sendRegistrationEmail(profilePayload);
+
     setSaving(false);
     setShowConfirmModal(false);
 
-    alert("User profile saved successfully.");
+    if (emailResult.success) {
+      alert("User profile saved successfully. Registration email sent.");
+    } else {
+      alert(
+        "User profile saved successfully, but the acceptance email was not sent. Please check the Edge Function logs or Supabase Invite Email setup."
+      );
+    }
+
     resetForm();
     setShowAddModal(false);
     fetchUsers();
@@ -283,6 +414,88 @@ export default function LGUUsersSection() {
           saved latitude/longitude will be used for the LGU collection map.
         </p>
       </div>
+
+      <section className="p-6 border-b bg-gray-50">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+          <div>
+            <h4 className="text-lg font-bold text-gray-900">
+              Pending Access Requests
+            </h4>
+            <p className="text-sm text-gray-500">
+              Emails submitted from the Login page Request Access form.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={fetchAccessRequests}
+            className="px-4 py-2 rounded-xl border bg-white text-sm font-semibold hover:bg-gray-100"
+          >
+            Refresh Requests
+          </button>
+        </div>
+
+        {loadingAccessRequests && (
+          <div className="bg-white border rounded-2xl p-4 text-sm text-gray-500">
+            Loading access requests...
+          </div>
+        )}
+
+        {!loadingAccessRequests && accessRequests.length === 0 && (
+          <div className="bg-white border rounded-2xl p-4 text-sm text-gray-500">
+            No pending access requests.
+          </div>
+        )}
+
+        {!loadingAccessRequests && accessRequests.length > 0 && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {accessRequests.map((request) => (
+              <div
+                key={request.id}
+                className="bg-white border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 break-all">
+                    {request.email}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Requested: {formatDate(request.created_at)}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copyEmail(request.email)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border text-xs font-semibold hover:bg-gray-50"
+                  >
+                    <Copy size={14} />
+                    Copy
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUseRequestEmail(request.email)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-green-700 text-white text-xs font-semibold hover:bg-green-800"
+                  >
+                    <UserPlus size={14} />
+                    Use in Add User
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => rejectAccessRequest(request)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100"
+                  >
+                    <Ban size={14} />
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px]">
@@ -625,20 +838,6 @@ export default function LGUUsersSection() {
                   assigned role. The LGU Admin is responsible for verifying the
                   user information before saving the profile.
                 </p>
-
-                <label className="mt-4 flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 accent-green-700"
-                  />
-
-                  <span className="text-sm text-yellow-900 font-semibold">
-                    I confirm that the details are correct and I agree to create
-                    or update this user profile.
-                  </span>
-                </label>
               </div>
 
               <div className="space-y-3 text-sm">
@@ -660,6 +859,20 @@ export default function LGUUsersSection() {
                   value={formatStatus(formData.status)}
                 />
               </div>
+
+              <label className="flex items-start gap-3 cursor-pointer border rounded-2xl p-4 bg-green-50 border-green-100">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 accent-green-700"
+                />
+
+                <span className="text-sm text-green-900 font-semibold leading-relaxed">
+                  I confirm that the details are correct and I agree to create or update this
+                  user profile.
+                </span>
+              </label>
             </div>
 
             <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
@@ -747,12 +960,12 @@ function StatusBadge({ status }) {
     currentStatus === "active"
       ? "bg-green-100 text-green-700"
       : currentStatus === "pending"
-      ? "bg-yellow-100 text-yellow-700"
-      : currentStatus === "rejected"
-      ? "bg-red-100 text-red-700"
-      : currentStatus === "disabled"
-      ? "bg-gray-100 text-gray-700"
-      : "bg-gray-100 text-gray-700";
+        ? "bg-yellow-100 text-yellow-700"
+        : currentStatus === "rejected"
+          ? "bg-red-100 text-red-700"
+          : currentStatus === "disabled"
+            ? "bg-gray-100 text-gray-700"
+            : "bg-gray-100 text-gray-700";
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style}`}>
@@ -776,4 +989,14 @@ function formatStatus(status) {
   if (status === "disabled") return "Disabled";
 
   return status || "Pending";
+}
+
+function formatDate(dateValue) {
+  if (!dateValue) return "N/A";
+
+  return new Date(dateValue).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }

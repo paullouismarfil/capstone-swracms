@@ -20,6 +20,7 @@ export default function LGUTopHeader({
   showBell = true,
   adminName = "MENRO Admin",
   adminEmail = "",
+  adminAvatar = "",
   onLogout,
   onChangePassword,
   onOpenMobileSidebar,
@@ -65,9 +66,11 @@ export default function LGUTopHeader({
                 onClick={() => setOpenProfileMenu((prev) => !prev)}
                 className="flex items-center gap-2 sm:gap-3 bg-white border shadow-sm px-2 sm:px-3 py-2 rounded-2xl hover:bg-gray-50 transition"
               >
-                <div className="w-10 h-10 rounded-full bg-green-100 text-green-800 flex items-center justify-center text-sm font-bold shrink-0">
-                  {getInitials(adminName)}
-                </div>
+                <ProfileAvatar
+                  name={adminName}
+                  avatarUrl={adminAvatar}
+                  size="small"
+                />
 
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-bold text-gray-900 max-w-[160px] truncate">
@@ -87,14 +90,22 @@ export default function LGUTopHeader({
 
               {openProfileMenu && (
                 <div className="absolute right-0 mt-3 w-72 max-w-[90vw] bg-white border rounded-2xl shadow-xl z-50 overflow-hidden">
-                  <div className="p-4 border-b">
-                    <p className="text-sm font-bold text-gray-900">
-                      {adminName}
-                    </p>
+                  <div className="p-4 border-b flex items-center gap-3">
+                    <ProfileAvatar
+                      name={adminName}
+                      avatarUrl={adminAvatar}
+                      size="menu"
+                    />
 
-                    <p className="text-sm text-gray-500 truncate">
-                      {adminEmail || "No email found"}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">
+                        {adminName}
+                      </p>
+
+                      <p className="text-sm text-gray-500 truncate">
+                        {adminEmail || "No email found"}
+                      </p>
+                    </div>
                   </div>
 
                   <button
@@ -172,9 +183,11 @@ export default function LGUTopHeader({
 
             <div className="p-5 sm:p-6">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-100 text-green-800 flex items-center justify-center text-lg sm:text-xl font-bold shrink-0">
-                  {getInitials(adminName)}
-                </div>
+                <ProfileAvatar
+                  name={adminName}
+                  avatarUrl={adminAvatar}
+                  size="large"
+                />
 
                 <div className="min-w-0">
                   <p className="text-lg font-bold text-gray-900 truncate">
@@ -227,6 +240,37 @@ export default function LGUTopHeader({
         </div>
       )}
     </>
+  );
+}
+
+function ProfileAvatar({ name, avatarUrl, size = "small" }) {
+  const sizeClass =
+    size === "large"
+      ? "w-14 h-14 sm:w-16 sm:h-16 text-lg sm:text-xl"
+      : size === "menu"
+      ? "w-11 h-11 text-sm"
+      : "w-10 h-10 text-sm";
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || "User profile"}
+        referrerPolicy="no-referrer"
+        className={`${sizeClass} rounded-full object-cover border border-green-100 shadow-sm shrink-0`}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClass} rounded-full bg-green-100 text-green-800 flex items-center justify-center font-bold shrink-0`}
+    >
+      {getInitials(name)}
+    </div>
   );
 }
 
