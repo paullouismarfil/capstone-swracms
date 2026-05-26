@@ -44,12 +44,13 @@ export default function LGUPortal() {
       return;
     }
 
-    setAdminEmail(user.email || "");
+    const loginEmail = String(user.email || "").toLowerCase();
+    setAdminEmail(loginEmail);
 
     const { data: profileData, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("email", loginEmail)
       .maybeSingle();
 
     if (error || !profileData) {
@@ -179,14 +180,20 @@ export default function LGUPortal() {
       return;
     }
 
-    if (requestData.status === "Collected") {
-      alert("This request is already collected and can no longer be changed.");
+    if (
+      requestData.status === "Collected" ||
+      requestData.status === "Improper Segregation"
+    ) {
+      alert("This request is already finalized and can no longer be changed.");
       return;
     }
 
     const { error } = await supabase
       .from("collection_requests")
-      .update({ status })
+      .update({
+        status,
+        status_updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
 
     if (error) {
@@ -212,9 +219,8 @@ export default function LGUPortal() {
         {
           role: "collector",
           title: "New Pickup Schedule",
-          message: `${
-            requestData?.barangay || "Barangay"
-          } request is now scheduled for collection.`,
+          message: `${requestData?.barangay || "Barangay"
+            } request is now scheduled for collection.`,
           type: "collection_schedule",
           is_read: false,
         },
@@ -226,9 +232,8 @@ export default function LGUPortal() {
         {
           role: "lgu_admin",
           title: "Collection Completed",
-          message: `${
-            requestData?.barangay || "Barangay"
-          } request has been marked as collected.`,
+          message: `${requestData?.barangay || "Barangay"
+            } request has been marked as collected.`,
           type: "collection_complete",
           is_read: false,
         },
@@ -440,9 +445,9 @@ function calculateWasteAnalytics(records) {
     const date = record.collected_date || record.created_at;
     const month = date
       ? new Date(date).toLocaleDateString("en-PH", {
-          month: "long",
-          year: "numeric",
-        })
+        month: "long",
+        year: "numeric",
+      })
       : "Unspecified";
 
     monthMap[month] = (monthMap[month] || 0) + kg;

@@ -1,19 +1,34 @@
 import { useState } from "react";
-import { ImagePlus, Send, X } from "lucide-react";
+import { ImagePlus, Send, X, Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import FormInput from "./FormInput";
 import SelectField from "./SelectField";
 
+const WASTE_TYPE_OPTIONS = [
+  "Recyclable",
+  "Plastic",
+  "Metal",
+  "Glass",
+  "Biodegradable",
+  "Residual",
+  "Mixed Waste",
+];
+
 export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
   const [form, setForm] = useState({
     request_title: "",
-    waste_type: "Recyclable",
     collection_point: "Barangay Hall",
     preferred_pickup_date: "",
-    estimated_weight: "",
     sacks_count: "",
     remarks: "",
   });
+
+  const [wasteItems, setWasteItems] = useState([
+    {
+      waste_type: "Recyclable",
+      estimated_weight: "",
+    },
+  ]);
 
   const [photoFiles, setPhotoFiles] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -23,6 +38,60 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function updateWasteItem(index, field, value) {
+    setWasteItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      )
+    );
+  }
+
+  function addWasteItem() {
+    setWasteItems((prev) => [
+      ...prev,
+      {
+        waste_type: "Plastic",
+        estimated_weight: "",
+      },
+    ]);
+  }
+
+  function removeWasteItem(index) {
+    setWasteItems((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((_, itemIndex) => itemIndex !== index);
+    });
+  }
+
+  function getValidWasteItems() {
+    return wasteItems
+      .map((item) => ({
+        waste_type: item.waste_type,
+        estimated_weight: String(item.estimated_weight || "").trim(),
+      }))
+      .filter((item) => item.waste_type && item.estimated_weight);
+  }
+
+  function getTotalEstimatedWeight(items) {
+    return items.reduce((total, item) => {
+      const number = Number(String(item.estimated_weight).replace(/[^0-9.]/g, ""));
+      return total + (Number.isNaN(number) ? 0 : number);
+    }, 0);
+  }
+
+  function getWasteTypeSummary(items) {
+    return items.map((item) => item.waste_type).join(", ");
+  }
+
+  function getWasteBreakdownText(items) {
+    return items
+      .map(
+        (item, index) =>
+          `${index + 1}. ${item.waste_type} - ${item.estimated_weight} kg`
+      )
+      .join("\n");
   }
 
   function handleSelectPhotos(e) {
@@ -99,8 +168,20 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
       return;
     }
 
-    if (!form.request_title.trim() || !form.estimated_weight.trim()) {
-      setMessage("Please complete the request title and estimated weight.");
+    const validWasteItems = getValidWasteItems();
+
+    if (!form.request_title.trim() || validWasteItems.length === 0) {
+      setMessage(
+        "Please complete the request title and add at least one waste type with estimated weight."
+      );
+      setMessageType("error");
+      return;
+    }
+
+    const totalEstimatedWeight = getTotalEstimatedWeight(validWasteItems);
+
+    if (totalEstimatedWeight <= 0) {
+      setMessage("Please enter a valid estimated weight.");
       setMessageType("error");
       return;
     }
@@ -110,15 +191,20 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
     try {
       const uploadedUrls = await uploadPhotos();
 
+      const wasteBreakdown = getWasteBreakdownText(validWasteItems);
+      const finalRemarks = form.remarks.trim()
+        ? `Waste Breakdown:\n${wasteBreakdown}\n\nRemarks:\n${form.remarks.trim()}`
+        : `Waste Breakdown:\n${wasteBreakdown}`;
+
       const requestPayload = {
         request_title: form.request_title.trim(),
         barangay: profile.barangay,
         collection_point: form.collection_point,
-        waste_type: form.waste_type,
-        estimated_weight: form.estimated_weight.trim(),
+        waste_type: getWasteTypeSummary(validWasteItems),
+        estimated_weight: String(totalEstimatedWeight),
         sacks_count: form.sacks_count.trim(),
         preferred_pickup_date: form.preferred_pickup_date || null,
-        remarks: form.remarks.trim(),
+        remarks: finalRemarks,
         status: "Pending",
         image_url: uploadedUrls[0] || null,
         image_urls: uploadedUrls,
@@ -161,13 +247,18 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
 
       setForm({
         request_title: "",
-        waste_type: "Recyclable",
         collection_point: "Barangay Hall",
         preferred_pickup_date: "",
-        estimated_weight: "",
         sacks_count: "",
         remarks: "",
       });
+
+      setWasteItems([
+        {
+          waste_type: "Recyclable",
+          estimated_weight: "",
+        },
+      ]);
 
       setPhotoFiles([]);
       setPhotoPreviews([]);
@@ -182,6 +273,9 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
       setSaving(false);
     }
   }
+
+  const validWasteItems = getValidWasteItems();
+  const totalEstimatedWeight = getTotalEstimatedWeight(validWasteItems);
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border p-6">
@@ -247,21 +341,6 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
         />
 
         <SelectField
-          label="Waste Type"
-          value={form.waste_type}
-          onChange={(value) => updateField("waste_type", value)}
-          options={[
-            "Recyclable",
-            "Plastic",
-            "Metal",
-            "Glass",
-            "Biodegradable",
-            "Residual",
-            "Mixed Waste",
-          ]}
-        />
-
-        <SelectField
           label="Collection Point"
           value={form.collection_point}
           onChange={(value) => updateField("collection_point", value)}
@@ -272,6 +351,74 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
             "Temporary Collection Site",
           ]}
         />
+
+        <div className="md:col-span-2 bg-gray-50 border rounded-3xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h4 className="font-bold text-gray-900">Waste Type Breakdown</h4>
+              <p className="text-sm text-gray-500">
+                Add one or more waste types included in this collection request.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={addWasteItem}
+              className="inline-flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-800"
+            >
+              <Plus size={16} />
+              Add Waste Type
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {wasteItems.map((item, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 bg-white border rounded-2xl p-4"
+              >
+                <SelectField
+                  label={`Waste Type ${index + 1}`}
+                  value={item.waste_type}
+                  onChange={(value) =>
+                    updateWasteItem(index, "waste_type", value)
+                  }
+                  options={WASTE_TYPE_OPTIONS}
+                />
+
+                <FormInput
+                  label="Estimated Weight"
+                  placeholder="e.g. 10"
+                  value={item.estimated_weight}
+                  onChange={(value) =>
+                    updateWasteItem(index, "estimated_weight", value)
+                  }
+                />
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => removeWasteItem(index)}
+                    disabled={wasteItems.length === 1}
+                    className="w-full md:w-auto inline-flex items-center justify-center gap-2 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-sm font-semibold hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 size={16} />
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 bg-green-50 border border-green-100 rounded-2xl p-4">
+            <p className="text-sm text-green-700 font-semibold">
+              Total Estimated Weight
+            </p>
+            <p className="text-2xl font-bold text-green-900 mt-1">
+              {totalEstimatedWeight} kg
+            </p>
+          </div>
+        </div>
 
         <div>
           <label className="text-sm font-medium text-gray-600">
@@ -287,13 +434,6 @@ export default function SubmitRequestForm({ profile, schedule, onSuccess }) {
             className="input-field"
           />
         </div>
-
-        <FormInput
-          label="Estimated Weight"
-          placeholder="e.g. 20"
-          value={form.estimated_weight}
-          onChange={(value) => updateField("estimated_weight", value)}
-        />
 
         <FormInput
           label="Number of Sacks / Containers"

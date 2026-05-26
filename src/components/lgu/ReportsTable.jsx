@@ -17,7 +17,7 @@ export default function ReportsTable({
         <div>
           <h3 className="text-xl font-bold">Waste Reports</h3>
           <p className="text-sm text-gray-500">
-            Live collection requests submitted by barangay users.
+            Live waste reports submitted by barangay users.
           </p>
         </div>
 
@@ -30,7 +30,7 @@ export default function ReportsTable({
         <table className="w-full min-w-[1250px]">
           <thead className="bg-gray-50 text-gray-500 text-sm">
             <tr>
-              <th className="p-4 text-left">Request ID</th>
+              <th className="p-4 text-left">Report ID</th>
               <th className="p-4 text-left">Barangay</th>
               <th className="p-4 text-left">Title</th>
               <th className="p-4 text-left">Waste Type</th>
@@ -48,7 +48,7 @@ export default function ReportsTable({
             {loading && (
               <tr>
                 <td className="p-4 text-gray-500" colSpan="11">
-                  Loading requests...
+                  Loading waste reports...
                 </td>
               </tr>
             )}
@@ -56,7 +56,7 @@ export default function ReportsTable({
             {!loading && reports.length === 0 && (
               <tr>
                 <td className="p-4 text-gray-500" colSpan="11">
-                  No submitted requests yet.
+                  No submitted waste reports yet.
                 </td>
               </tr>
             )}
@@ -64,7 +64,9 @@ export default function ReportsTable({
             {!loading &&
               reports.map((report) => {
                 const photos = report.image_urls || [];
-                const isCollected = report.status === "Collected";
+                const isFinalized =
+                  report.status === "Collected" ||
+                  report.status === "Improper Segregation";
 
                 return (
                   <tr key={report.id} className="border-t hover:bg-gray-50">
@@ -130,7 +132,7 @@ export default function ReportsTable({
                           Review
                         </button>
 
-                        {isCollected ? (
+                        {isFinalized ? (
                           <span className="inline-flex items-center gap-1 text-gray-500 font-semibold text-sm">
                             <Lock size={14} />
                             Finalized
@@ -189,13 +191,19 @@ function StatusBadge({ status }) {
       ? "bg-green-100 text-green-700"
       : status === "Scheduled"
       ? "bg-blue-100 text-blue-700"
+      : status === "In Progress"
+      ? "bg-yellow-100 text-yellow-700"
       : status === "Missed"
       ? "bg-red-100 text-red-600"
+      : status === "Improper Segregation"
+      ? "bg-orange-100 text-orange-700"
+      : status === "Pending"
+      ? "bg-gray-100 text-gray-700"
       : "bg-orange-100 text-orange-600";
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style}`}>
-      {status}
+      {status || "Pending"}
     </span>
   );
 }

@@ -53,54 +53,41 @@ export default function CollectionMap({ requests = [] }) {
     setBarangayLocations(data || []);
   }
 
-  const mapPoints =
-    requests.length > 0
-      ? requests.map((request) => {
-          const foundLocation = findBarangayLocation(
-            request.barangay,
-            barangayLocations
-          );
+  const visibleRequests = requests.filter((request) => {
+    if (request.status !== "Collected") return true;
 
-          return {
-            id: request.id,
-            barangay:
-              request.barangay ||
-              foundLocation?.barangay ||
-              "Unknown Barangay",
-            status: request.status || "Pending",
-            waste: request.waste_type || "Unspecified",
-            weight:
-              request.estimated_weight ||
-              request.actual_weight ||
-              request.weight ||
-              "N/A",
-            collectionPoint: request.collection_point || "N/A",
-            position: foundLocation
-              ? [foundLocation.latitude, foundLocation.longitude]
-              : sibalomCenter,
-          };
-        })
-      : barangayLocations.length > 0
-      ? barangayLocations.slice(0, 5).map((item) => ({
-          id: item.id,
-          barangay: item.barangay,
-          status: "Pending",
-          waste: "No request yet",
-          weight: "N/A",
-          collectionPoint: "Barangay collection point",
-          position: [item.latitude, item.longitude],
-        }))
-      : [
-          {
-            id: 1,
-            barangay: "Barangay Poblacion",
-            status: "Pending",
-            waste: "No request yet",
-            weight: "N/A",
-            collectionPoint: "Barangay Hall",
-            position: sibalomCenter,
-          },
-        ];
+    return !isCollectedExpired(request);
+  });
+
+  const mapPoints = visibleRequests
+    .map((request) => {
+      const foundLocation = findBarangayLocation(
+        request.barangay,
+        barangayLocations
+      );
+
+      if (!foundLocation?.latitude || !foundLocation?.longitude) {
+        return null;
+      }
+
+      return {
+        id: request.id,
+        barangay:
+          request.barangay || foundLocation?.barangay || "Unknown Barangay",
+        status: request.status || "Pending",
+        waste: request.waste_type || "Unspecified",
+        weight:
+          request.estimated_weight ||
+          request.actual_weight ||
+          request.weight ||
+          "N/A",
+        collectionPoint: request.collection_point || "N/A",
+        position: [foundLocation.latitude, foundLocation.longitude],
+        statusUpdatedAt:
+          request.status_updated_at || request.updated_at || request.created_at,
+      };
+    })
+    .filter(Boolean);
 
   function getIcon(status) {
     if (status === "Collected") return greenIcon;
@@ -128,7 +115,7 @@ export default function CollectionMap({ requests = [] }) {
         </p>
       </div>
 
-      <div className="h-[650px] w-full">
+      <div className="h-[650px] w-full relative">
         <MapContainer
           center={sibalomCenter}
           zoom={13}
@@ -167,6 +154,13 @@ export default function CollectionMap({ requests = [] }) {
                   <p>
                     <strong>Estimated:</strong> {formatKg(point.weight)}
                   </p>
+
+                  {point.status === "Collected" && (
+                    <p className="text-xs text-gray-500">
+                      This collected marker will automatically disappear after
+                      24 hours.
+                    </p>
+                  )}
                 </div>
               </Popup>
 
@@ -182,6 +176,12 @@ export default function CollectionMap({ requests = [] }) {
             </Marker>
           ))}
         </MapContainer>
+
+        {mapPoints.length === 0 && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-white/95 border shadow rounded-2xl px-5 py-3 text-sm text-gray-600">
+            No active pickup requests to display on the map.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 border-t bg-gray-50">
@@ -191,6 +191,20 @@ export default function CollectionMap({ requests = [] }) {
       </div>
     </div>
   );
+}
+
+function isCollectedExpired(request) {
+  const collectedTime =
+    request.status_updated_at || request.updated_at || request.created_at;
+
+  if (!collectedTime) return false;
+
+  const collectedDate = new Date(collectedTime).getTime();
+  const now = Date.now();
+
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  return now - collectedDate > oneDay;
 }
 
 function findBarangayLocation(barangayName, barangayLocations) {

@@ -7,7 +7,6 @@ import {
   Mail,
   Home,
   Phone,
-  KeyRound,
   MapPin,
   Lock,
 } from "lucide-react";
@@ -15,13 +14,15 @@ import { supabase } from "../../lib/supabase";
 
 export default function LGUUsersSection() {
   const [users, setUsers] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState("");
+  const [barangayLocations, setBarangayLocations] = useState([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    id: "",
     full_name: "",
     email: "",
     role: "barangay_user",
@@ -35,14 +36,15 @@ export default function LGUUsersSection() {
   useEffect(() => {
     loadCurrentUser();
     fetchUsers();
+    fetchBarangayLocations();
   }, []);
 
   async function loadCurrentUser() {
     const { data } = await supabase.auth.getSession();
     const user = data?.session?.user;
 
-    if (user?.id) {
-      setCurrentUserId(user.id);
+    if (user?.email) {
+      setCurrentUserEmail(user.email.toLowerCase());
     }
   }
 
@@ -66,6 +68,21 @@ export default function LGUUsersSection() {
     setLoading(false);
   }
 
+  async function fetchBarangayLocations() {
+    const { data, error } = await supabase
+      .from("barangay_locations")
+      .select("*")
+      .order("barangay", { ascending: true });
+
+    if (error) {
+      console.error("Fetch barangay locations error:", error);
+      alert("Failed to load barangay list. Check barangay_locations table.");
+      return;
+    }
+
+    setBarangayLocations(data || []);
+  }
+
   function handleChange(e) {
     const { name, value } = e.target;
 
@@ -87,9 +104,31 @@ export default function LGUUsersSection() {
     });
   }
 
+  function handleBarangayChange(e) {
+    const selectedBarangay = e.target.value;
+
+    const selectedLocation = barangayLocations.find(
+      (item) => item.barangay === selectedBarangay
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      barangay: selectedBarangay,
+      latitude:
+        selectedLocation?.latitude !== null &&
+        selectedLocation?.latitude !== undefined
+          ? String(selectedLocation.latitude)
+          : "",
+      longitude:
+        selectedLocation?.longitude !== null &&
+        selectedLocation?.longitude !== undefined
+          ? String(selectedLocation.longitude)
+          : "",
+    }));
+  }
+
   function resetForm() {
     setFormData({
-      id: "",
       full_name: "",
       email: "",
       role: "barangay_user",
@@ -99,15 +138,20 @@ export default function LGUUsersSection() {
       contact_number: "",
       status: "active",
     });
+
+    setAgreedToTerms(false);
   }
 
-  async function handleAddUser(e) {
-    e.preventDefault();
+  function closeAddUserModal() {
+    if (saving) return;
 
-    if (!formData.id.trim()) {
-      alert("Please enter the Auth User ID from Supabase Authentication.");
-      return;
-    }
+    setShowAddModal(false);
+    setShowConfirmModal(false);
+    resetForm();
+  }
+
+  function handleAddUser(e) {
+    e.preventDefault();
 
     if (!formData.full_name.trim() || !formData.email.trim() || !formData.role) {
       alert("Please fill in full name, email, and role.");
@@ -115,33 +159,23 @@ export default function LGUUsersSection() {
     }
 
     if (formData.role === "barangay_user" && !formData.barangay.trim()) {
-      alert("Please enter the assigned barangay.");
+      alert("Please select the assigned barangay.");
       return;
     }
 
-    const hasLatitude = formData.latitude.trim() !== "";
-    const hasLongitude = formData.longitude.trim() !== "";
+    setAgreedToTerms(false);
+    setShowConfirmModal(true);
+  }
 
-    if (formData.role === "barangay_user" && hasLatitude !== hasLongitude) {
-      alert("Please enter both latitude and longitude, or leave both blank.");
-      return;
-    }
-
-    if (
-      formData.role === "barangay_user" &&
-      hasLatitude &&
-      hasLongitude &&
-      (Number.isNaN(Number(formData.latitude)) ||
-        Number.isNaN(Number(formData.longitude)))
-    ) {
-      alert("Latitude and longitude must be valid numbers.");
+  async function confirmCreateUser() {
+    if (!agreedToTerms) {
+      alert("Please confirm the terms before creating the user.");
       return;
     }
 
     setSaving(true);
 
     const profilePayload = {
-      id: formData.id.trim(),
       email: formData.email.trim().toLowerCase(),
       full_name: formData.full_name.trim(),
       role: formData.role,
@@ -154,7 +188,7 @@ export default function LGUUsersSection() {
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert(profilePayload, {
-        onConflict: "id",
+        onConflict: "email",
       });
 
     if (profileError) {
@@ -167,31 +201,8 @@ export default function LGUUsersSection() {
       return;
     }
 
-    if (formData.role === "barangay_user" && hasLatitude && hasLongitude) {
-      const { error: locationError } = await supabase
-        .from("barangay_locations")
-        .upsert(
-          {
-            barangay: formData.barangay.trim(),
-            latitude: Number(formData.latitude),
-            longitude: Number(formData.longitude),
-          },
-          {
-            onConflict: "barangay",
-          }
-        );
-
-      if (locationError) {
-        setSaving(false);
-        console.error("Save barangay location error:", locationError);
-        alert(
-          "User profile was saved, but barangay map location failed to save. Check barangay_locations table or RLS."
-        );
-        return;
-      }
-    }
-
     setSaving(false);
+    setShowConfirmModal(false);
 
     alert("User profile saved successfully.");
     resetForm();
@@ -200,20 +211,29 @@ export default function LGUUsersSection() {
   }
 
   async function updateUserStatus(user, status) {
-    if (!user?.id) {
-      alert("User ID not found.");
+    if (!user?.email) {
+      alert("User email not found.");
       return;
     }
 
-    if (String(user.id) === String(currentUserId)) {
+    if (String(user.email).toLowerCase() === String(currentUserEmail)) {
       alert("You cannot deactivate your own LGU admin account.");
       return;
     }
 
+    const confirmMessage =
+      status === "disabled"
+        ? `Are you sure you want to deactivate ${user.email}? This user will not be able to access the system.`
+        : `Are you sure you want to activate ${user.email}?`;
+
+    const confirmed = window.confirm(confirmMessage);
+
+    if (!confirmed) return;
+
     const { error } = await supabase
       .from("profiles")
       .update({ status })
-      .eq("id", user.id);
+      .eq("email", String(user.email).toLowerCase());
 
     if (error) {
       console.error(error);
@@ -223,6 +243,10 @@ export default function LGUUsersSection() {
 
     fetchUsers();
   }
+
+  const selectedBarangayLocation = barangayLocations.find(
+    (item) => item.barangay === formData.barangay
+  );
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
@@ -244,11 +268,19 @@ export default function LGUUsersSection() {
         </button>
       </div>
 
-      <div className="p-4 bg-yellow-50 border-b border-yellow-100">
-        <p className="text-sm text-yellow-800">
-          Google Account Flow: Let each user log in once using Google, then copy
-          their Supabase Auth User UID and save their profile here using the same
-          email, Auth User ID, role, and assigned barangay.
+      <div className="p-4 bg-green-50 border-b border-green-100">
+        <p className="text-sm text-green-800">
+          Email-Based Account Flow: Add the user's email, role, barangay
+          assignment, and status here. When the user logs in using the same
+          email, the system will recognize the profile automatically.
+        </p>
+      </div>
+
+      <div className="p-4 bg-blue-50 border-b border-blue-100">
+        <p className="text-sm text-blue-800">
+          Barangay Location Flow: Barangay options are loaded from the
+          barangay_locations table. Select a barangay from the dropdown and the
+          saved latitude/longitude will be used for the LGU collection map.
         </p>
       </div>
 
@@ -285,7 +317,8 @@ export default function LGUUsersSection() {
             {!loading &&
               users.map((user) => {
                 const isCurrentAccount =
-                  String(user.id) === String(currentUserId);
+                  String(user.email || "").toLowerCase() ===
+                  String(currentUserEmail).toLowerCase();
 
                 return (
                   <tr
@@ -327,7 +360,7 @@ export default function LGUUsersSection() {
                       ) : user.status === "active" ? (
                         <button
                           type="button"
-                          onClick={() => updateUserStatus(user, "inactive")}
+                          onClick={() => updateUserStatus(user, "disabled")}
                           className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100"
                         >
                           Deactivate
@@ -356,17 +389,14 @@ export default function LGUUsersSection() {
               <div>
                 <h3 className="text-2xl font-bold">Add User Profile</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Create or sign in the Google account first, then paste the
-                  Supabase Auth User UID here.
+                  Register the user by email. No need to copy the Supabase Auth
+                  UID manually.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowAddModal(false);
-                  resetForm();
-                }}
+                onClick={closeAddUserModal}
                 className="w-10 h-10 rounded-2xl border flex items-center justify-center hover:bg-gray-50 transition"
               >
                 <X size={18} />
@@ -375,15 +405,6 @@ export default function LGUUsersSection() {
 
             <form onSubmit={handleAddUser} className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InputField
-                  icon={<KeyRound size={18} />}
-                  label="Auth User ID"
-                  name="id"
-                  value={formData.id}
-                  onChange={handleChange}
-                  placeholder="Paste Supabase Auth User UID"
-                />
-
                 <InputField
                   icon={<Users size={18} />}
                   label="Full Name"
@@ -426,36 +447,76 @@ export default function LGUUsersSection() {
 
                 {formData.role === "barangay_user" && (
                   <>
-                    <InputField
-                      icon={<Home size={18} />}
-                      label="Assigned Barangay"
-                      name="barangay"
-                      value={formData.barangay}
-                      onChange={handleChange}
-                      placeholder="Example: Barangay Alangan"
-                    />
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">
+                        Assigned Barangay
+                      </label>
 
-                    <InputField
-                      icon={<MapPin size={18} />}
-                      label="Latitude Optional"
-                      name="latitude"
-                      value={formData.latitude}
-                      onChange={handleChange}
-                      placeholder="Example: 10.7738"
-                      type="number"
-                      step="any"
-                    />
+                      <div className="mt-2 flex items-center gap-3 border rounded-2xl px-4 py-3 bg-gray-50 focus-within:border-green-500">
+                        <Home size={18} className="text-gray-400" />
 
-                    <InputField
-                      icon={<MapPin size={18} />}
-                      label="Longitude Optional"
-                      name="longitude"
-                      value={formData.longitude}
-                      onChange={handleChange}
-                      placeholder="Example: 122.0098"
-                      type="number"
-                      step="any"
-                    />
+                        <select
+                          name="barangay"
+                          value={formData.barangay}
+                          onChange={handleBarangayChange}
+                          className="w-full bg-transparent outline-none text-sm text-gray-800"
+                        >
+                          <option value="">Select barangay</option>
+
+                          {barangayLocations.map((item) => (
+                            <option
+                              key={item.id || item.barangay}
+                              value={item.barangay}
+                            >
+                              {item.barangay}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {barangayLocations.length === 0 && (
+                        <p className="text-xs text-red-600 mt-2">
+                          No barangay locations found. Please add barangays in
+                          the barangay_locations table.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2 bg-gray-50 border rounded-2xl p-4">
+                      <div className="flex items-start gap-3">
+                        <MapPin size={18} className="text-green-700 mt-0.5" />
+
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">
+                            Saved Barangay Coordinates
+                          </p>
+
+                          {formData.barangay ? (
+                            <p className="text-sm text-gray-600 mt-1">
+                              {selectedBarangayLocation ? (
+                                <>
+                                  Latitude:{" "}
+                                  <span className="font-semibold">
+                                    {selectedBarangayLocation.latitude ?? "N/A"}
+                                  </span>{" "}
+                                  • Longitude:{" "}
+                                  <span className="font-semibold">
+                                    {selectedBarangayLocation.longitude ?? "N/A"}
+                                  </span>
+                                </>
+                              ) : (
+                                "No saved coordinates found for this barangay."
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-500 mt-1">
+                              Select a barangay to view its saved latitude and
+                              longitude.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
 
@@ -480,8 +541,9 @@ export default function LGUUsersSection() {
                     className="mt-2 w-full border rounded-2xl px-4 py-3 outline-none focus:border-green-500 bg-gray-50"
                   >
                     <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="disabled">Disabled</option>
                   </select>
                 </div>
               </div>
@@ -491,21 +553,19 @@ export default function LGUUsersSection() {
                   Barangay map location
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  Latitude and longitude are optional. Add them only when you
-                  already have the correct barangay coordinates. If provided,
-                  they will be saved to barangay_locations for the LGU Collection
-                  Map.
+                  Barangay coordinates are loaded from the barangay_locations
+                  table. To update a barangay marker location, edit the
+                  latitude and longitude in that table instead of entering them
+                  manually here.
                 </p>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetForm();
-                  }}
-                  className="px-5 py-3 rounded-2xl border text-sm font-semibold hover:bg-gray-50 transition"
+                  onClick={closeAddUserModal}
+                  disabled={saving}
+                  className="px-5 py-3 rounded-2xl border text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -515,10 +575,112 @@ export default function LGUUsersSection() {
                   disabled={saving}
                   className="px-5 py-3 rounded-2xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save User"}
+                  Continue
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1000] p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  Account Terms and Confirmation
+                </h3>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Review and confirm the terms before saving this user profile.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={saving}
+                className="w-10 h-10 rounded-2xl border flex items-center justify-center hover:bg-gray-50 transition disabled:opacity-60"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4">
+                <p className="text-sm font-bold text-yellow-900">
+                  Terms and Account Authorization
+                </p>
+
+                <p className="text-sm text-yellow-800 leading-relaxed mt-2">
+                  By creating this user profile, the LGU Admin confirms that the
+                  provided email address, assigned role, barangay assignment,
+                  contact information, and account status are correct and
+                  authorized for use in SWRaCMS.
+                </p>
+
+                <p className="text-xs text-yellow-700 leading-relaxed mt-2">
+                  This account may access system features depending on its
+                  assigned role. The LGU Admin is responsible for verifying the
+                  user information before saving the profile.
+                </p>
+
+                <label className="mt-4 flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-1 w-4 h-4 accent-green-700"
+                  />
+
+                  <span className="text-sm text-yellow-900 font-semibold">
+                    I confirm that the details are correct and I agree to create
+                    or update this user profile.
+                  </span>
+                </label>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <ConfirmRow label="Full Name" value={formData.full_name} />
+                <ConfirmRow label="Email" value={formData.email} />
+                <ConfirmRow label="Role" value={formatRole(formData.role)} />
+                <ConfirmRow
+                  label="Barangay"
+                  value={
+                    formData.role === "barangay_user" ? formData.barangay : "—"
+                  }
+                />
+                <ConfirmRow
+                  label="Contact Number"
+                  value={formData.contact_number || "No contact number"}
+                />
+                <ConfirmRow
+                  label="Status"
+                  value={formatStatus(formData.status)}
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={saving}
+                className="px-5 py-3 rounded-2xl border text-sm font-semibold hover:bg-white transition disabled:opacity-60"
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmCreateUser}
+                disabled={saving || !agreedToTerms}
+                className="px-5 py-3 rounded-2xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving..." : "Agree and Create User"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -557,15 +719,19 @@ function InputField({
   );
 }
 
+function ConfirmRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border rounded-2xl px-4 py-3 bg-gray-50">
+      <p className="text-gray-500">{label}</p>
+      <p className="font-semibold text-gray-900 text-right break-all">
+        {value || "N/A"}
+      </p>
+    </div>
+  );
+}
+
 function RoleBadge({ role }) {
-  const label =
-    role === "lgu_admin"
-      ? "LGU Admin"
-      : role === "barangay_user"
-      ? "Barangay User"
-      : role === "collection_staff"
-      ? "Collection Staff"
-      : role || "Unknown";
+  const label = formatRole(role);
 
   return (
     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
@@ -575,18 +741,39 @@ function RoleBadge({ role }) {
 }
 
 function StatusBadge({ status }) {
-  const currentStatus = status || "inactive";
+  const currentStatus = status || "pending";
 
   const style =
     currentStatus === "active"
       ? "bg-green-100 text-green-700"
-      : currentStatus === "suspended"
-      ? "bg-orange-100 text-orange-700"
-      : "bg-red-100 text-red-700";
+      : currentStatus === "pending"
+      ? "bg-yellow-100 text-yellow-700"
+      : currentStatus === "rejected"
+      ? "bg-red-100 text-red-700"
+      : currentStatus === "disabled"
+      ? "bg-gray-100 text-gray-700"
+      : "bg-gray-100 text-gray-700";
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style}`}>
-      {currentStatus}
+      {formatStatus(currentStatus)}
     </span>
   );
+}
+
+function formatRole(role) {
+  if (role === "lgu_admin") return "LGU Admin";
+  if (role === "barangay_user") return "Barangay User";
+  if (role === "collection_staff") return "Collection Staff";
+
+  return role || "Unknown";
+}
+
+function formatStatus(status) {
+  if (status === "active") return "Active";
+  if (status === "pending") return "Pending";
+  if (status === "rejected") return "Rejected";
+  if (status === "disabled") return "Disabled";
+
+  return status || "Pending";
 }

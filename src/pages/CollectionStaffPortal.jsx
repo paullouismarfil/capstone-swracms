@@ -43,12 +43,13 @@ export default function CollectionStaffPortal() {
       return;
     }
 
-    setCollectorEmail(user.email || "");
+    const loginEmail = String(user.email || "").toLowerCase();
+    setCollectorEmail(loginEmail);
 
     const { data: profileData, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("email", loginEmail)
       .maybeSingle();
 
     if (error || !profileData) {
@@ -154,8 +155,11 @@ export default function CollectionStaffPortal() {
       return;
     }
 
-    if (requestData.status === "Collected") {
-      alert("This request is already collected and can no longer be changed.");
+    if (
+      requestData.status === "Collected" ||
+      requestData.status === "Improper Segregation"
+    ) {
+      alert("This request is already finalized and can no longer be changed.");
       return;
     }
 
@@ -178,12 +182,46 @@ export default function CollectionStaffPortal() {
             title: "Collection In Progress",
             message: `${
               requestData?.barangay || "Barangay"
-            } waste collection is now in progress.`,
+            } waste collection is now in progress. Please make sure waste is properly segregated before pickup.`,
             type: "collection_progress",
             is_read: false,
           },
         ]);
       }
+    }
+
+    if (status === "Improper Segregation") {
+      const notificationRows = [];
+
+      if (requestData.submitted_by) {
+        notificationRows.push({
+          user_id: requestData.submitted_by,
+          title: "Waste Not Collected",
+          message: `${
+            requestData?.barangay || "Your barangay"
+          } waste was not collected because it was not properly segregated. Please separate waste according to MENRO guidelines before the next collection schedule.`,
+          type: "improper_segregation",
+          is_read: false,
+        });
+      }
+
+      notificationRows.push({
+        role: "lgu_admin",
+        title: "Improper Waste Segregation",
+        message: `${
+          requestData?.barangay || "Barangay"
+        } was marked as not collected due to improper waste segregation.`,
+        type: "improper_segregation",
+        is_read: false,
+      });
+
+      if (notificationRows.length > 0) {
+        await supabase.from("notifications").insert(notificationRows);
+      }
+
+      fetchAssignedRequests();
+      fetchWasteRecords();
+      return;
     }
 
     if (status === "Collected") {

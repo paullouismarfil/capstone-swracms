@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PackageCheck, Lock } from "lucide-react";
+import { PackageCheck, Lock, AlertTriangle } from "lucide-react";
 
 export default function QuickStatusUpdate({ requests, onStatusChange }) {
   const [requestId, setRequestId] = useState("");
@@ -7,7 +7,9 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
   const [message, setMessage] = useState("");
 
   const editableRequests = requests.filter(
-    (request) => request.status !== "Collected"
+    (request) =>
+      request.status !== "Collected" &&
+      request.status !== "Improper Segregation"
   );
 
   async function handleUpdate() {
@@ -25,13 +27,24 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
       return;
     }
 
-    if (selectedRequest.status === "Collected") {
-      setMessage("This request is already collected and can no longer be changed.");
+    if (
+      selectedRequest.status === "Collected" ||
+      selectedRequest.status === "Improper Segregation"
+    ) {
+      setMessage("This request is already finalized and can no longer be changed.");
       return;
     }
 
     await onStatusChange(Number(requestId), status);
-    setMessage("Status updated successfully.");
+
+    if (status === "Improper Segregation") {
+      setMessage(
+        "Status updated. Waste was marked as not collected due to improper segregation."
+      );
+    } else {
+      setMessage("Status updated successfully.");
+    }
+
     setRequestId("");
     setStatus("In Progress");
   }
@@ -39,6 +52,7 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
   return (
     <div className="bg-white rounded-3xl shadow-sm border p-6 max-w-2xl">
       <h3 className="text-xl font-bold">Update Collection Status</h3>
+
       <p className="text-sm text-gray-500 mb-5">
         Update the current progress of the assigned pickup request.
       </p>
@@ -52,7 +66,8 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
       {editableRequests.length === 0 && (
         <div className="mb-4 bg-gray-100 text-gray-600 px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
           <Lock size={16} />
-          No editable pickup requests available. Collected requests are finalized.
+          No editable pickup requests available. Collected and improper
+          segregation records are finalized.
         </div>
       )}
 
@@ -90,9 +105,22 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
           >
             <option>In Progress</option>
             <option>Collected</option>
+            <option>Improper Segregation</option>
             <option>Missed</option>
           </select>
         </div>
+
+        {status === "Improper Segregation" && (
+          <div className="bg-orange-50 border border-orange-100 text-orange-700 px-4 py-3 rounded-2xl text-sm flex items-start gap-2">
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+
+            <p>
+              This will mark the request as not collected because the waste was
+              not properly segregated. It will notify the barangay and LGU, and
+              it will not be added to collected waste records.
+            </p>
+          </div>
+        )}
 
         <button
           onClick={handleUpdate}

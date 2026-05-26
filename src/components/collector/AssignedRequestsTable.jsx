@@ -28,7 +28,7 @@ export default function AssignedRequestsTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1150px]">
+        <table className="w-full min-w-[1200px]">
           <thead className="bg-gray-50 text-gray-500 text-sm">
             <tr>
               <th className="p-4 text-left">Request ID</th>
@@ -63,7 +63,9 @@ export default function AssignedRequestsTable({
 
             {!loading &&
               requests.map((task) => {
-                const isCollected = task.status === "Collected";
+                const isFinalized =
+                  task.status === "Collected" ||
+                  task.status === "Improper Segregation";
 
                 return (
                   <tr key={task.id} className="border-t hover:bg-gray-50">
@@ -103,7 +105,7 @@ export default function AssignedRequestsTable({
 
                     <td className="p-4">
                       <div className="flex gap-2 flex-wrap items-center">
-                        {isCollected ? (
+                        {isFinalized ? (
                           <span className="inline-flex items-center gap-1 text-gray-500 font-semibold text-sm">
                             <Lock size={14} />
                             Finalized
@@ -129,6 +131,20 @@ export default function AssignedRequestsTable({
                                 className="text-green-700 font-semibold text-sm"
                               >
                                 Mark Collected
+                              </button>
+                            )}
+
+                            {task.status === "In Progress" && (
+                              <button
+                                onClick={() =>
+                                  onStatusChange(
+                                    task.id,
+                                    "Improper Segregation"
+                                  )
+                                }
+                                className="text-orange-600 font-semibold text-sm"
+                              >
+                                Improper Segregation
                               </button>
                             )}
 

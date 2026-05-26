@@ -8,11 +8,15 @@ export default function StatusBadge({ status }) {
       ? "bg-yellow-100 text-yellow-700"
       : status === "Missed"
       ? "bg-red-100 text-red-600"
+      : status === "Improper Segregation"
+      ? "bg-orange-100 text-orange-700"
+      : status === "Pending"
+      ? "bg-gray-100 text-gray-700"
       : "bg-orange-100 text-orange-600";
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style}`}>
-      {status}
+      {status || "Pending"}
     </span>
   );
 }

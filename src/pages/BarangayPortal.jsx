@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { findBarangaySchedule } from "../data/collectionSchedule";
 import { searchCollectionRequests } from "../utils/searchHelpers";
+import { createBarangayScheduleReminder } from "../utils/scheduleReminderHelper";
 import NotificationsPage from "../components/NotificationsPage";
 import BarangaySidebar from "../components/barangay/BarangaySidebar";
 import BarangayHeader from "../components/barangay/BarangayHeader";
@@ -46,12 +47,13 @@ export default function BarangayPortal() {
       return;
     }
 
-    setUserEmail(user.email || "");
+    const loginEmail = String(user.email || "").toLowerCase();
+    setUserEmail(loginEmail);
 
     const { data: profileData, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("email", loginEmail)
       .maybeSingle();
 
     if (error || !profileData) {
@@ -80,6 +82,9 @@ export default function BarangayPortal() {
 
     setProfile(profileData);
     fetchRequests(profileData.barangay);
+
+    // Schedule-based waste segregation reminder.
+    await createBarangayScheduleReminder(profileData);
   }
 
   async function fetchRequests(barangayName) {
