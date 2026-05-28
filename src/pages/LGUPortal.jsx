@@ -20,7 +20,10 @@ import { collectionSchedule } from "../data/collectionSchedule";
 import { supabase } from "../lib/supabase";
 
 export default function LGUPortal() {
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(() => {
+    return localStorage.getItem("lguActiveSection") || "dashboard";
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [requests, setRequests] = useState([]);
   const [wasteRecords, setWasteRecords] = useState([]);
@@ -34,6 +37,10 @@ export default function LGUPortal() {
   useEffect(() => {
     loadAdminProfile();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("lguActiveSection", activeSection);
+  }, [activeSection]);
 
   async function loadAdminProfile() {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -56,6 +63,7 @@ export default function LGUPortal() {
     if (error || !profileData) {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem("lguActiveSection");
       alert("This account is not registered in the system.");
       window.location.href = "/";
       return;
@@ -64,6 +72,7 @@ export default function LGUPortal() {
     if (profileData.role !== "lgu_admin") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem("lguActiveSection");
       alert("Access denied. This account is not allowed to open LGU Admin Portal.");
       window.location.href = "/";
       return;
@@ -72,6 +81,7 @@ export default function LGUPortal() {
     if (profileData.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem("lguActiveSection");
       alert("Your account is not active. Please contact the LGU Admin.");
       window.location.href = "/";
       return;
@@ -85,6 +95,7 @@ export default function LGUPortal() {
   async function handleLogout() {
     await supabase.auth.signOut();
     localStorage.removeItem("pendingRole");
+    localStorage.removeItem("lguActiveSection");
     window.location.href = "/";
   }
 

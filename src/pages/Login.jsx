@@ -79,8 +79,58 @@ export default function Login() {
   };
 
   useEffect(() => {
-    checkOAuthSession();
+    checkExistingSession();
   }, []);
+
+  async function checkExistingSession() {
+    const pendingRole = localStorage.getItem("pendingRole");
+
+    if (pendingRole) {
+      await checkOAuthSession();
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const user = data?.session?.user;
+
+    if (!user) return;
+
+    const normalizedEmail = String(user.email || "").trim().toLowerCase();
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      await supabase.auth.signOut();
+      localStorage.removeItem("pendingRole");
+      return;
+    }
+
+    if (profile.status !== "active") {
+      await supabase.auth.signOut();
+      localStorage.removeItem("pendingRole");
+      return;
+    }
+
+    await updateLoginMetadata(normalizedEmail, profile);
+
+    if (profile.role === "lgu_admin") {
+      navigate("/lgu", { replace: true });
+      return;
+    }
+
+    if (profile.role === "barangay_user") {
+      navigate("/barangay", { replace: true });
+      return;
+    }
+
+    if (profile.role === "collection_staff") {
+      navigate("/collector", { replace: true });
+    }
+  }
 
   async function checkOAuthSession() {
     const pendingRole = localStorage.getItem("pendingRole");
