@@ -348,7 +348,7 @@ export default function LGUUsersSection() {
     }
 
     if (String(user.email).toLowerCase() === String(currentUserEmail)) {
-      alert("You cannot deactivate your own LGU admin account.");
+      alert("You cannot deactivate your own MENRO admin account.");
       return;
     }
 
@@ -385,7 +385,7 @@ export default function LGUUsersSection() {
         <div>
           <h3 className="text-xl font-bold">Manage Users</h3>
           <p className="text-sm text-gray-500">
-            Register and manage LGU, barangay, and collection staff profiles.
+            Register and manage MENRO, barangay, and collection staff profiles.
           </p>
         </div>
 
@@ -411,7 +411,7 @@ export default function LGUUsersSection() {
         <p className="text-sm text-blue-800">
           Barangay Location Flow: Barangay options are loaded from the
           barangay_locations table. Select a barangay from the dropdown and the
-          saved latitude/longitude will be used for the LGU collection map.
+          saved latitude/longitude will be used for the MENRO collection map.
         </p>
       </div>
 
@@ -653,7 +653,7 @@ export default function LGUUsersSection() {
                     >
                       <option value="barangay_user">Barangay User</option>
                       <option value="collection_staff">Collection Staff</option>
-                      <option value="lgu_admin">LGU Admin</option>
+                      <option value="lgu_admin">MENRO Admin</option>
                     </select>
                   </div>
                 </div>
@@ -827,7 +827,7 @@ export default function LGUUsersSection() {
                 </p>
 
                 <p className="text-sm text-yellow-800 leading-relaxed mt-2">
-                  By creating this user profile, the LGU Admin confirms that the
+                  By creating this user profile, the MENRO Admin confirms that the
                   provided email address, assigned role, barangay assignment,
                   contact information, and account status are correct and
                   authorized for use in SWRaCMS.
@@ -835,7 +835,7 @@ export default function LGUUsersSection() {
 
                 <p className="text-xs text-yellow-700 leading-relaxed mt-2">
                   This account may access system features depending on its
-                  assigned role. The LGU Admin is responsible for verifying the
+                  assigned role. The MENRO Admin is responsible for verifying the
                   user information before saving the profile.
                 </p>
               </div>
@@ -975,7 +975,7 @@ function StatusBadge({ status }) {
 }
 
 function formatRole(role) {
-  if (role === "lgu_admin") return "LGU Admin";
+  if (role === "lgu_admin") return "MENRO Admin";
   if (role === "barangay_user") return "Barangay User";
   if (role === "collection_staff") return "Collection Staff";
 

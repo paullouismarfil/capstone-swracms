@@ -50,7 +50,7 @@ function ScheduleCard({ item }) {
             <span className="font-semibold">Waste:</span> {item.wasteCategory}
           </p>
           <p>
-            <span className="font-semibold">Vehicle:</span> LGU Garbage Truck
+            <span className="font-semibold">Vehicle:</span> MENRO Garbage Truck
           </p>
         </div>
       </div>

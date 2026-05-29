@@ -35,7 +35,7 @@ export default function Login() {
 
   const roles = [
     {
-      title: "LGU Admin",
+      title: "MENRO Admin",
       role: "lgu_admin",
       icon: <Landmark size={28} />,
       desc: "Manage reports, schedules, analytics, and system settings.",
@@ -233,7 +233,7 @@ export default function Login() {
     if (profile.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
-      setError("Your account is not yet approved by the LGU Admin.");
+      setError("Your account is not yet approved by the MENRO Admin.");
       return;
     }
 
@@ -339,7 +339,7 @@ export default function Login() {
     if (existingRequest) {
       if (existingRequest.status === "pending") {
         setRequestMessage(
-          "You already submitted an access request. Please wait for LGU Admin approval."
+          "You already submitted an access request. Please wait for MENRO Admin approval."
         );
       } else if (existingRequest.status === "approved") {
         setRequestMessage(
@@ -347,7 +347,7 @@ export default function Login() {
         );
       } else if (existingRequest.status === "rejected") {
         setRequestMessage(
-          "Your access request was rejected. Please contact the LGU Admin for assistance."
+          "Your access request was rejected. Please contact the MENRO Admin for assistance."
         );
       } else {
         setRequestMessage("This email already has an access request record.");
@@ -370,12 +370,12 @@ export default function Login() {
 
       if (error.code === "23505") {
         setRequestMessage(
-          "You already submitted an access request. Please wait for LGU Admin approval."
+          "You already submitted an access request. Please wait for MENRO Admin approval."
         );
       } else {
         setRequestMessage(
           error.message ||
-            "Failed to submit access request. Please contact the LGU Admin."
+            "Failed to submit access request. Please contact the MENRO Admin."
         );
       }
 
@@ -385,7 +385,7 @@ export default function Login() {
     }
 
     setRequestMessage(
-      "Access request submitted successfully. Please wait for LGU Admin approval."
+      "Access request submitted successfully. Please wait for MENRO Admin approval."
     );
     setRequestMessageType("success");
     setRequestLoading(false);
@@ -570,7 +570,7 @@ export default function Login() {
               </h3>
 
               <p className="text-sm sm:text-base text-gray-500 mt-2">
-                Use an authorized account registered by the LGU Admin.
+                Use an authorized account registered by the MENRO Admin.
               </p>
             </div>
 
@@ -641,7 +641,7 @@ export default function Login() {
             </div>
 
             <p className="text-center text-xs text-gray-400 mt-5">
-              If your account is not yet approved, please contact the LGU Admin.
+              If your account is not yet approved, please contact the MENRO Admin.
             </p>
           </div>
         </div>
@@ -669,7 +669,7 @@ export default function Login() {
               </h3>
 
               <p className="text-sm sm:text-base text-gray-500 mt-2">
-                Enter your email address. The LGU Admin will review your
+                Enter your email address. The MENRO Admin will review your
                 request before granting access.
               </p>
             </div>
@@ -708,7 +708,7 @@ export default function Login() {
 
             <p className="text-center text-xs text-gray-400 mt-5">
               Submitting a request does not automatically create an account.
-              The LGU Admin must approve and register your email first.
+              The MENRO Admin must approve and register your email first.
             </p>
           </div>
         </div>

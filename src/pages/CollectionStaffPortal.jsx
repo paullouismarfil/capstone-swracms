@@ -71,7 +71,7 @@ export default function CollectionStaffPortal() {
     if (profileData.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
-      alert("Your account is not active. Please contact the LGU Admin.");
+      alert("Your account is not active. Please contact the MENRO Admin.");
       window.location.href = "/";
       return;
     }

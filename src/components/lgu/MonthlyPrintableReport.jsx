@@ -26,10 +26,24 @@ export default function MonthlyPrintableReport({ records = [] }) {
     0
   );
 
-  const recyclableKg = filteredRecords.reduce((sum, record) => {
-    const kg = parseKg(record.actual_weight);
-    return isRecyclable(record.waste_type) ? sum + kg : sum;
-  }, 0);
+  const wasteTypeSummary = useMemo(() => {
+    return calculateWasteTypeSummary(filteredRecords);
+  }, [filteredRecords]);
+
+  const wasteChartData = useMemo(() => {
+    return Object.entries(wasteTypeSummary)
+      .map(([type, kg]) => ({
+        type,
+        kg,
+        percent: totalKg > 0 ? Math.round((kg / totalKg) * 100) : 0,
+        category: isRecyclable(type) ? "Recyclable" : "Non-Recyclable",
+      }))
+      .sort((a, b) => b.kg - a.kg);
+  }, [wasteTypeSummary, totalKg]);
+
+  const recyclableKg = wasteChartData
+    .filter((item) => item.category === "Recyclable")
+    .reduce((sum, item) => sum + item.kg, 0);
 
   const nonRecyclableKg = Math.max(totalKg - recyclableKg, 0);
 
@@ -41,14 +55,6 @@ export default function MonthlyPrintableReport({ records = [] }) {
       (record) => record.route_name || record.barangay || "Unspecified"
     )
   ).size;
-
-  const wasteTypeSummary = filteredRecords.reduce((acc, record) => {
-    const type = record.waste_type || "Unspecified";
-    const kg = parseKg(record.actual_weight);
-
-    acc[type] = (acc[type] || 0) + kg;
-    return acc;
-  }, {});
 
   function handlePrint() {
     window.print();
@@ -124,20 +130,31 @@ export default function MonthlyPrintableReport({ records = [] }) {
         id="monthly-report-print-area"
         className="bg-white rounded-3xl shadow-sm border p-8"
       >
-        <div className="text-center border-b pb-6">
-          <p className="text-sm font-semibold uppercase">
-            Republic of the Philippines
-          </p>
-          <p className="text-sm">Province of Antique</p>
-          <p className="text-sm">Municipality of Sibalom</p>
+        <div className="relative border-b pb-6">
+          <img
+            src="/menro-logo.jpg"
+            alt="MENRO Logo"
+            className="w-20 h-20 object-contain mx-auto mb-3"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
 
-          <h1 className="text-2xl font-bold mt-5">
-            MENRO Monthly Waste Collection Report
-          </h1>
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase">
+              Republic of the Philippines
+            </p>
+            <p className="text-sm">Province of Antique</p>
+            <p className="text-sm">Municipality of Sibalom</p>
 
-          <p className="text-gray-600 mt-1">
-            For the Month of {monthNames[selectedMonth]} {selectedYear}
-          </p>
+            <h1 className="text-2xl font-bold mt-5">
+              MENRO Monthly Waste Collection Report
+            </h1>
+
+            <p className="text-gray-600 mt-1">
+              For the Month of {monthNames[selectedMonth]} {selectedYear}
+            </p>
+          </div>
         </div>
 
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
@@ -169,6 +186,76 @@ export default function MonthlyPrintableReport({ records = [] }) {
         </section>
 
         <section className="mt-8">
+          <div className="border rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold">
+                  Waste Composition Pie Graph
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Percentage distribution of collected waste by type for the
+                  selected month.
+                </p>
+              </div>
+
+              <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">
+                <FileText size={16} />
+                Monthly visual summary
+              </div>
+            </div>
+
+            {wasteChartData.length === 0 ? (
+              <div className="bg-gray-50 border rounded-2xl p-6 text-gray-500 text-sm">
+                No waste composition data available for this selected month.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                <div className="flex justify-center">
+                  <WastePieChart data={wasteChartData} totalKg={totalKg} />
+                </div>
+
+                <div className="space-y-3">
+                  {wasteChartData.map((item, index) => (
+                    <div
+                      key={item.type}
+                      className="flex items-center justify-between gap-3 border rounded-2xl p-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="w-4 h-4 rounded-full shrink-0"
+                          style={{
+                            backgroundColor:
+                              PIE_COLORS[index % PIE_COLORS.length],
+                          }}
+                        ></span>
+
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">
+                            {item.type}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {item.category}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold">
+                          {item.kg.toFixed(2)} kg
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {item.percent}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-8">
           <h2 className="text-lg font-bold mb-3">Waste Type Summary</h2>
 
           <div className="border rounded-2xl overflow-hidden">
@@ -178,23 +265,24 @@ export default function MonthlyPrintableReport({ records = [] }) {
                   <th className="text-left p-3">Waste Type</th>
                   <th className="text-left p-3">Category</th>
                   <th className="text-left p-3">Total Weight</th>
+                  <th className="text-left p-3">Percentage</th>
                 </tr>
               </thead>
 
               <tbody>
-                {Object.entries(wasteTypeSummary).length === 0 && (
+                {wasteChartData.length === 0 && (
                   <tr>
-                    <td className="p-3 text-gray-500" colSpan="3">
+                    <td className="p-3 text-gray-500" colSpan="4">
                       No waste records found for this month.
                     </td>
                   </tr>
                 )}
 
-                {Object.entries(wasteTypeSummary).map(([type, kg]) => (
-                  <tr key={type} className="border-t">
-                    <td className="p-3">{type}</td>
+                {wasteChartData.map((item) => (
+                  <tr key={item.type} className="border-t">
+                    <td className="p-3">{item.type}</td>
                     <td className="p-3">
-                      {isRecyclable(type) ? (
+                      {item.category === "Recyclable" ? (
                         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                           Recyclable
                         </span>
@@ -204,7 +292,10 @@ export default function MonthlyPrintableReport({ records = [] }) {
                         </span>
                       )}
                     </td>
-                    <td className="p-3 font-semibold">{kg.toFixed(2)} kg</td>
+                    <td className="p-3 font-semibold">
+                      {item.kg.toFixed(2)} kg
+                    </td>
+                    <td className="p-3 font-semibold">{item.percent}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -270,7 +361,7 @@ export default function MonthlyPrintableReport({ records = [] }) {
           <div>
             <p className="text-sm text-gray-500">Prepared by:</p>
             <div className="border-b mt-10"></div>
-            <p className="text-sm font-semibold mt-2">MENRO / LGU Admin</p>
+            <p className="text-sm font-semibold mt-2">MENRO Admin</p>
           </div>
 
           <div>
@@ -307,6 +398,86 @@ export default function MonthlyPrintableReport({ records = [] }) {
   );
 }
 
+function WastePieChart({ data, totalKg }) {
+  const size = 230;
+  const center = size / 2;
+  const radius = 86;
+  const strokeWidth = 42;
+  const circumference = 2 * Math.PI * radius;
+
+  let cumulativePercent = 0;
+
+  if (!data.length || totalKg <= 0) {
+    return (
+      <div className="w-[230px] h-[230px] rounded-full border flex items-center justify-center text-sm text-gray-500">
+        No Data
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-[230px] h-[230px]">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth={strokeWidth}
+        />
+
+        {data.map((item, index) => {
+          const percent = totalKg > 0 ? item.kg / totalKg : 0;
+          const dash = percent * circumference;
+          const gap = circumference - dash;
+          const offset = -cumulativePercent * circumference;
+
+          cumulativePercent += percent;
+
+          return (
+            <circle
+              key={item.type}
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke={PIE_COLORS[index % PIE_COLORS.length]}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${dash} ${gap}`}
+              strokeDashoffset={offset}
+              strokeLinecap="butt"
+              transform={`rotate(-90 ${center} ${center})`}
+            />
+          );
+        })}
+
+        <circle cx={center} cy={center} r={46} fill="white" />
+
+        <text
+          x={center}
+          y={center - 5}
+          textAnchor="middle"
+          className="fill-gray-900"
+          style={{ fontSize: "22px", fontWeight: "700" }}
+        >
+          {totalKg.toFixed(0)}
+        </text>
+
+        <text
+          x={center}
+          y={center + 18}
+          textAnchor="middle"
+          className="fill-gray-500"
+          style={{ fontSize: "12px" }}
+        >
+          kg total
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function ReportBox({ label, value }) {
   return (
     <div className="border rounded-2xl p-4 bg-gray-50">
@@ -314,6 +485,31 @@ function ReportBox({ label, value }) {
       <p className="text-lg font-bold mt-1">{value}</p>
     </div>
   );
+}
+
+function calculateWasteTypeSummary(records) {
+  return records.reduce((acc, record) => {
+    const kg = parseKg(record.actual_weight);
+    const types = splitWasteTypes(record.waste_type);
+    const kgPerType = types.length > 0 ? kg / types.length : kg;
+
+    types.forEach((type) => {
+      acc[type] = (acc[type] || 0) + kgPerType;
+    });
+
+    return acc;
+  }, {});
+}
+
+function splitWasteTypes(type) {
+  if (!type) return ["Unspecified"];
+
+  const types = String(type)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return types.length > 0 ? types : ["Unspecified"];
 }
 
 function parseKg(value) {
@@ -352,6 +548,17 @@ function formatDate(dateValue) {
     day: "numeric",
   });
 }
+
+const PIE_COLORS = [
+  "#16a34a",
+  "#2563eb",
+  "#f97316",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#ca8a04",
+  "#4b5563",
+];
 
 const monthNames = [
   "January",

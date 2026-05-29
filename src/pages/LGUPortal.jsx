@@ -73,7 +73,7 @@ export default function LGUPortal() {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
       localStorage.removeItem("lguActiveSection");
-      alert("Access denied. This account is not allowed to open LGU Admin Portal.");
+      alert("Access denied. This account is not allowed to open MENRO Admin Portal.");
       window.location.href = "/";
       return;
     }

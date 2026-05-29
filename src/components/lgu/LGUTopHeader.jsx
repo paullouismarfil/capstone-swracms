@@ -78,7 +78,7 @@ export default function LGUTopHeader({
                   </p>
 
                   <p className="text-xs text-gray-500 max-w-[180px] truncate">
-                    {adminEmail || "LGU Administrator"}
+                    {adminEmail || "MENRO Administrator"}
                   </p>
                 </div>
 
@@ -168,7 +168,7 @@ export default function LGUTopHeader({
               <div>
                 <h3 className="text-xl sm:text-2xl font-bold">My Profile</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  LGU administrator account information.
+                  MENRO administrator account information.
                 </p>
               </div>
 
@@ -215,7 +215,7 @@ export default function LGUTopHeader({
                 <ProfileRow
                   icon={<ShieldCheck size={18} />}
                   label="Role"
-                  value="LGU Admin"
+                  value="MENRO Admin"
                 />
 
                 <ProfileRow
@@ -303,7 +303,7 @@ function getInitials(name) {
 
 function getPageTitle(activeSection) {
   const titles = {
-    dashboard: "LGU Waste Management Dashboard",
+    dashboard: "MENRO Waste Management Dashboard",
     reports: "Waste Collection Reports",
     notifications: "Notifications",
     schedule: "Collection Schedule",
@@ -314,7 +314,7 @@ function getPageTitle(activeSection) {
     users: "Manage Users",
   };
 
-  return titles[activeSection] || "LGU Dashboard";
+  return titles[activeSection] || "MENRO Dashboard";
 }
 
 function getPageSubtitle(activeSection) {

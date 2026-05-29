@@ -26,7 +26,7 @@ export default function LGUStatCards({
       <StatCard
         title="Pending Requests"
         value={pendingRequests}
-        note="Needs LGU validation"
+        note="Needs MENRO validation"
         icon={<Clock size={26} />}
         color="orange"
       />
