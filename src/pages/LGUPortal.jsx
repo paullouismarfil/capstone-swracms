@@ -82,7 +82,7 @@ export default function LGUPortal() {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
       localStorage.removeItem("lguActiveSection");
-      alert("Your account is not active. Please contact the LGU Admin.");
+      alert("Your account is not active. Please contact the MENRO Admin.");
       window.location.href = "/";
       return;
     }
@@ -230,9 +230,8 @@ export default function LGUPortal() {
         {
           role: "collector",
           title: "New Pickup Schedule",
-          message: `${
-            requestData?.barangay || "Barangay"
-          } request is now scheduled for collection.`,
+          message: `${requestData?.barangay || "Barangay"
+            } request is now scheduled for collection.`,
           type: "collection_schedule",
           is_read: false,
         },
@@ -244,9 +243,8 @@ export default function LGUPortal() {
         {
           role: "lgu_admin",
           title: "Collection Completed",
-          message: `${
-            requestData?.barangay || "Barangay"
-          } request has been marked as collected.`,
+          message: `${requestData?.barangay || "Barangay"
+            } request has been marked as collected.`,
           type: "collection_complete",
           is_read: false,
         },
@@ -378,15 +376,24 @@ export default function LGUPortal() {
               </h3>
 
               <p className="text-sm text-gray-500 mb-5">
-                Barangay performance is based on actual collected requests,
-                total collected waste, recyclable participation, and missed
-                collection penalties.
+                Barangay performance is based on useful recyclable and recoverable
+                materials, not on the highest total garbage volume. The ranking rewards
+                plastic, metal, glass, and recyclable waste that can still be reused,
+                recycled, or sold.
               </p>
 
-              <MiniBadge label="Collected Requests" value="+10 pts each" />
-              <MiniBadge label="Total Collected Waste" value="+1 pt per kg" />
-              <MiniBadge label="Recyclable Percentage" value="Bonus pts" />
-              <MiniBadge label="Missed Requests" value="-5 pts each" />
+              <MiniBadge label="Plastic Collected" value="+3 pts per kg" />
+              <MiniBadge label="Metal Collected" value="+5 pts per kg" />
+              <MiniBadge label="Glass Collected" value="+2 pts per kg" />
+              <MiniBadge label="Recyclable Waste" value="+3 pts per kg" />
+
+              <MiniBadge
+                label="Residual / Mixed / Biodegradable"
+                value="0 pts"
+              />
+
+              <MiniBadge label="Missed Collection" value="-5 pts" />
+              <MiniBadge label="Improper Segregation" value="-10 pts" />
             </div>
           </div>
         )}
@@ -471,9 +478,9 @@ function calculateWasteAnalytics(records) {
     const date = record.collected_date || record.created_at;
     const month = date
       ? new Date(date).toLocaleDateString("en-PH", {
-          month: "long",
-          year: "numeric",
-        })
+        month: "long",
+        year: "numeric",
+      })
       : "Unspecified";
 
     monthMap[month] = (monthMap[month] || 0) + kg;

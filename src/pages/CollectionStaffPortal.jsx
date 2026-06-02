@@ -18,8 +18,29 @@ import CollectionHistory from "../components/collector/CollectionHistory";
 
 import { CalendarDays, CheckCircle, Clock, Truck } from "lucide-react";
 
+const COLLECTOR_ACTIVE_SECTION_KEY = "collectorActiveSection";
+
+const VALID_COLLECTOR_SECTIONS = [
+  "dashboard",
+  "assigned",
+  "status",
+  "notifications",
+  "recording",
+  "history",
+];
+
+function getSavedCollectorSection() {
+  const savedSection = localStorage.getItem(COLLECTOR_ACTIVE_SECTION_KEY);
+
+  if (VALID_COLLECTOR_SECTIONS.includes(savedSection)) {
+    return savedSection;
+  }
+
+  return "dashboard";
+}
+
 export default function CollectionStaffPortal() {
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(getSavedCollectorSection);
   const [assignedRequests, setAssignedRequests] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -33,6 +54,14 @@ export default function CollectionStaffPortal() {
   useEffect(() => {
     loadCollectorProfile();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(COLLECTOR_ACTIVE_SECTION_KEY, activeSection);
+
+    if (!["assigned", "status", "recording", "history"].includes(activeSection)) {
+      setSearchTerm("");
+    }
+  }, [activeSection]);
 
   async function loadCollectorProfile() {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -55,6 +84,7 @@ export default function CollectionStaffPortal() {
     if (error || !profileData) {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(COLLECTOR_ACTIVE_SECTION_KEY);
       alert("This account is not registered in the system.");
       window.location.href = "/";
       return;
@@ -63,6 +93,7 @@ export default function CollectionStaffPortal() {
     if (profileData.role !== "collection_staff") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(COLLECTOR_ACTIVE_SECTION_KEY);
       alert("Access denied. This account is not allowed to open Collector Portal.");
       window.location.href = "/";
       return;
@@ -71,6 +102,7 @@ export default function CollectionStaffPortal() {
     if (profileData.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(COLLECTOR_ACTIVE_SECTION_KEY);
       alert("Your account is not active. Please contact the MENRO Admin.");
       window.location.href = "/";
       return;
@@ -148,7 +180,9 @@ export default function CollectionStaffPortal() {
   }
 
   async function updateRequestStatus(id, status) {
-    const requestData = assignedRequests.find((item) => item.id === id);
+    const requestData = assignedRequests.find(
+      (item) => String(item.id) === String(id)
+    );
 
     if (!requestData) {
       alert("Request not found.");
@@ -166,7 +200,7 @@ export default function CollectionStaffPortal() {
     const { error } = await supabase
       .from("collection_requests")
       .update({ status })
-      .eq("id", id);
+      .eq("id", Number(id));
 
     if (error) {
       console.error("Update request status error:", error);
@@ -180,9 +214,8 @@ export default function CollectionStaffPortal() {
           {
             user_id: requestData.submitted_by,
             title: "Collection In Progress",
-            message: `${
-              requestData?.barangay || "Barangay"
-            } waste collection is now in progress. Please make sure waste is properly segregated before pickup.`,
+            message: `${requestData?.barangay || "Barangay"
+              } waste collection is now in progress. Please make sure waste is properly segregated before pickup.`,
             type: "collection_progress",
             is_read: false,
           },
@@ -197,9 +230,8 @@ export default function CollectionStaffPortal() {
         notificationRows.push({
           user_id: requestData.submitted_by,
           title: "Waste Not Collected",
-          message: `${
-            requestData?.barangay || "Your barangay"
-          } waste was not collected because it was not properly segregated. Please separate waste according to MENRO guidelines before the next collection schedule.`,
+          message: `${requestData?.barangay || "Your barangay"
+            } waste was not collected because it was not properly segregated. Please separate waste according to MENRO guidelines before the next collection schedule.`,
           type: "improper_segregation",
           is_read: false,
         });
@@ -208,9 +240,8 @@ export default function CollectionStaffPortal() {
       notificationRows.push({
         role: "lgu_admin",
         title: "Improper Waste Segregation",
-        message: `${
-          requestData?.barangay || "Barangay"
-        } was marked as not collected due to improper waste segregation.`,
+        message: `${requestData?.barangay || "Barangay"
+          } was marked as not collected due to improper waste segregation.`,
         type: "improper_segregation",
         is_read: false,
       });
@@ -231,9 +262,8 @@ export default function CollectionStaffPortal() {
         notificationRows.push({
           user_id: requestData.submitted_by,
           title: "Waste Successfully Collected",
-          message: `${
-            requestData?.barangay || "Barangay"
-          } waste request has been collected by MENRO.`,
+          message: `${requestData?.barangay || "Barangay"
+            } waste request has been collected by MENRO.`,
           type: "collection_complete",
           is_read: false,
         });
@@ -242,9 +272,8 @@ export default function CollectionStaffPortal() {
       notificationRows.push({
         role: "lgu_admin",
         title: "Collection Completed",
-        message: `${
-          requestData?.barangay || "Barangay"
-        } request has been completed by collection staff.`,
+        message: `${requestData?.barangay || "Barangay"
+          } request has been completed by collection staff.`,
         type: "collection_complete",
         is_read: false,
       });
@@ -261,6 +290,7 @@ export default function CollectionStaffPortal() {
   async function handleLogout() {
     await supabase.auth.signOut();
     localStorage.removeItem("pendingRole");
+    localStorage.removeItem(COLLECTOR_ACTIVE_SECTION_KEY);
     window.location.href = "/";
   }
 

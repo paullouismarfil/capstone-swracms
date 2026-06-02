@@ -87,14 +87,14 @@ export default function CollectorSidebar({
 
           <SidebarItem
             icon={<CalendarDays size={20} />}
-            label="Assigned Requests"
+            label="Assigned Pickups"
             active={activeSection === "assigned"}
             onClick={() => handleNavigate("assigned")}
           />
 
           <SidebarItem
             icon={<ClipboardCheck size={20} />}
-            label="Update Status"
+            label="Pickup Status"
             active={activeSection === "status"}
             onClick={() => handleNavigate("status")}
           />
@@ -108,7 +108,7 @@ export default function CollectorSidebar({
 
           <SidebarItem
             icon={<Scale size={20} />}
-            label="Waste Recording"
+            label="Collection Recording"
             active={activeSection === "recording"}
             onClick={() => handleNavigate("recording")}
           />

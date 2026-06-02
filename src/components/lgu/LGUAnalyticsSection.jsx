@@ -1,13 +1,59 @@
 import { FileText, Scale, Recycle, ChartPie } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
+const WASTE_TYPE_CONFIG = {
+  Recyclable: {
+    color: "#16a34a",
+    category: "Recyclable",
+  },
+  Plastic: {
+    color: "#2563eb",
+    category: "Recyclable",
+  },
+  Metal: {
+    color: "#0d9488",
+    category: "Recyclable",
+  },
+  Glass: {
+    color: "#0891b2",
+    category: "Recyclable",
+  },
+  Biodegradable: {
+    color: "#f97316",
+    category: "Non-Recyclable",
+  },
+  Residual: {
+    color: "#dc2626",
+    category: "Non-Recyclable",
+  },
+  "Mixed Waste": {
+    color: "#4b5563",
+    category: "Non-Recyclable",
+  },
+  Unspecified: {
+    color: "#94a3b8",
+    category: "Unspecified",
+  },
+};
+
+const WASTE_TYPE_ORDER = [
+  "Recyclable",
+  "Plastic",
+  "Metal",
+  "Glass",
+  "Biodegradable",
+  "Residual",
+  "Mixed Waste",
+  "Unspecified",
+];
+
 export default function LGUAnalyticsSection({ analytics, records }) {
   return (
     <div className="space-y-6">
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         <StatCard
           title="Total Waste Collected"
-          value={`${analytics.totalKg} kg`}
+          value={`${formatKg(analytics.totalKg)} kg`}
           note="Actual recorded waste"
           icon={<Scale size={26} />}
           color="green"
@@ -49,21 +95,20 @@ export default function LGUAnalyticsSection({ analytics, records }) {
 }
 
 export function LGUWasteCompositionCard({ analytics }) {
-  const chartData = analytics.wasteTypes.map((item) => ({
-    name: item.type,
-    value: item.kg,
-  }));
+  const sortedWasteTypes = getSortedWasteTypes(analytics.wasteTypes);
 
-  const COLORS = [
-    "#16a34a",
-    "#2563eb",
-    "#f97316",
-    "#dc2626",
-    "#7c3aed",
-    "#0891b2",
-    "#ca8a04",
-    "#4b5563",
-  ];
+  const chartData = sortedWasteTypes.map((item) => {
+    const type = normalizeWasteType(item.type);
+    const config = getWasteTypeConfig(type);
+
+    return {
+      name: type,
+      value: Number(item.kg) || 0,
+      percent: item.percent,
+      color: config.color,
+      category: config.category,
+    };
+  });
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border p-6">
@@ -86,30 +131,31 @@ export function LGUWasteCompositionCard({ analytics }) {
                   outerRadius={110}
                   innerRadius={50}
                   paddingAngle={3}
-                  label={({ name, percent }) =>
-                    `${name} ${(percent * 100).toFixed(0)}%`
-                  }
+                  label={({ payload }) => `${payload.name} ${payload.percent}%`}
                 >
-                  {chartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                  {chartData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Pie>
 
-                <Tooltip />
+                <Tooltip
+                  formatter={(value, name) => [
+                    `${formatKg(value)} kg`,
+                    name,
+                  ]}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
           <div className="mt-6 space-y-4">
-            {analytics.wasteTypes.map((item) => (
+            {chartData.map((item) => (
               <ProgressRow
-                key={item.type}
-                label={item.type}
-                value={`${item.kg} kg`}
+                key={item.name}
+                label={item.name}
+                value={`${formatKg(item.value)} kg`}
                 percent={item.percent}
+                color={item.color}
               />
             ))}
           </div>
@@ -128,14 +174,17 @@ export function LGUAnalyticsSummaryCard({ analytics }) {
       </p>
 
       <div className="space-y-4">
-        <MiniBadge label="Total Actual Waste" value={`${analytics.totalKg} kg`} />
+        <MiniBadge
+          label="Total Actual Waste"
+          value={`${formatKg(analytics.totalKg)} kg`}
+        />
         <MiniBadge
           label="Recyclable Waste"
-          value={`${analytics.recyclableKg} kg`}
+          value={`${formatKg(analytics.recyclableKg)} kg`}
         />
         <MiniBadge
           label="Non-Recyclable Waste"
-          value={`${analytics.nonRecyclableKg} kg`}
+          value={`${formatKg(analytics.nonRecyclableKg)} kg`}
         />
         <MiniBadge
           label="Recyclable Percentage"
@@ -162,7 +211,7 @@ function MonthlyWasteTrend({ analytics }) {
             <TrendBar
               key={item.month}
               month={item.month}
-              value={`${item.kg} kg`}
+              value={`${formatKg(item.kg)} kg`}
               width={`${item.percent}%`}
             />
           ))}
@@ -200,7 +249,9 @@ function BarangayWasteRanking({ analytics }) {
                 </div>
               </div>
 
-              <p className="font-bold text-green-700">{item.kg} kg</p>
+              <p className="font-bold text-green-700">
+                {formatKg(item.kg)} kg
+              </p>
             </div>
           ))}
         </div>
@@ -210,6 +261,8 @@ function BarangayWasteRanking({ analytics }) {
 }
 
 function WasteTypeTable({ analytics }) {
+  const sortedWasteTypes = getSortedWasteTypes(analytics.wasteTypes);
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
       <div className="p-6 border-b">
@@ -231,7 +284,7 @@ function WasteTypeTable({ analytics }) {
           </thead>
 
           <tbody>
-            {analytics.wasteTypes.length === 0 && (
+            {sortedWasteTypes.length === 0 && (
               <tr>
                 <td colSpan="4" className="p-4 text-gray-500">
                   No waste records yet.
@@ -239,24 +292,44 @@ function WasteTypeTable({ analytics }) {
               </tr>
             )}
 
-            {analytics.wasteTypes.map((item) => (
-              <tr key={item.type} className="border-t hover:bg-gray-50">
-                <td className="p-4 font-semibold">{item.type}</td>
-                <td className="p-4 text-green-700 font-bold">{item.kg} kg</td>
-                <td className="p-4">{item.percent}%</td>
-                <td className="p-4">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      isRecyclable(item.type)
-                        ? "bg-green-100 text-green-700"
-                        : "bg-orange-100 text-orange-700"
-                    }`}
-                  >
-                    {isRecyclable(item.type) ? "Recyclable" : "Non-Recyclable"}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {sortedWasteTypes.map((item) => {
+              const type = normalizeWasteType(item.type);
+              const config = getWasteTypeConfig(type);
+
+              return (
+                <tr key={type} className="border-t hover:bg-gray-50">
+                  <td className="p-4 font-semibold">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: config.color }}
+                      />
+                      {type}
+                    </div>
+                  </td>
+
+                  <td className="p-4 font-bold" style={{ color: config.color }}>
+                    {formatKg(item.kg)} kg
+                  </td>
+
+                  <td className="p-4">{item.percent}%</td>
+
+                  <td className="p-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        config.category === "Recyclable"
+                          ? "bg-green-100 text-green-700"
+                          : config.category === "Non-Recyclable"
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {config.category}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -264,7 +337,7 @@ function WasteTypeTable({ analytics }) {
   );
 }
 
-function ProgressRow({ label, value, percent }) {
+function ProgressRow({ label, value, percent, color }) {
   return (
     <div>
       <div className="flex justify-between text-sm mb-2">
@@ -276,8 +349,11 @@ function ProgressRow({ label, value, percent }) {
 
       <div className="w-full bg-gray-200 rounded-full h-3">
         <div
-          className="bg-green-600 h-3 rounded-full"
-          style={{ width: `${percent}%` }}
+          className="h-3 rounded-full"
+          style={{
+            width: `${percent}%`,
+            backgroundColor: color,
+          }}
         ></div>
       </div>
     </div>
@@ -345,15 +421,63 @@ function StatCard({ title, value, note, icon, color }) {
   );
 }
 
-function isRecyclable(type) {
-  const recyclableTypes = [
-    "recyclable",
-    "plastic",
-    "metal",
-    "glass",
-  ];
+function getSortedWasteTypes(wasteTypes = []) {
+  return [...wasteTypes]
+    .map((item) => ({
+      ...item,
+      type: normalizeWasteType(item.type),
+    }))
+    .sort((a, b) => {
+      const aIndex = WASTE_TYPE_ORDER.indexOf(a.type);
+      const bIndex = WASTE_TYPE_ORDER.indexOf(b.type);
 
+      const safeAIndex = aIndex === -1 ? 999 : aIndex;
+      const safeBIndex = bIndex === -1 ? 999 : bIndex;
+
+      return safeAIndex - safeBIndex;
+    });
+}
+
+function normalizeWasteType(type) {
+  const lower = String(type || "").trim().toLowerCase();
+
+  if (lower.includes("plastic")) return "Plastic";
+  if (lower.includes("metal")) return "Metal";
+  if (lower.includes("glass")) return "Glass";
+  if (lower.includes("bio")) return "Biodegradable";
+  if (lower.includes("residual")) return "Residual";
+  if (lower.includes("mixed")) return "Mixed Waste";
+  if (lower.includes("recyclable")) return "Recyclable";
+
+  return String(type || "Unspecified").trim() || "Unspecified";
+}
+
+function getWasteTypeConfig(type) {
+  return (
+    WASTE_TYPE_CONFIG[type] || {
+      color: "#94a3b8",
+      category: isRecyclable(type) ? "Recyclable" : "Non-Recyclable",
+    }
+  );
+}
+
+function isRecyclable(type) {
   const lower = String(type || "").toLowerCase();
 
-  return recyclableTypes.some((keyword) => lower.includes(keyword));
+  return (
+    lower.includes("recyclable") ||
+    lower.includes("plastic") ||
+    lower.includes("metal") ||
+    lower.includes("glass")
+  );
+}
+
+function formatKg(value) {
+  const number = Number(value) || 0;
+
+  if (Number.isInteger(number)) {
+    return String(number);
+  }
+
+  return String(Number(number.toFixed(2)));
 }

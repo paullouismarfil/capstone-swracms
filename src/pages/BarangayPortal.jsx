@@ -22,8 +22,29 @@ import {
   CheckCircle,
 } from "lucide-react";
 
+const BARANGAY_ACTIVE_SECTION_KEY = "barangayActiveSection";
+
+const VALID_BARANGAY_SECTIONS = [
+  "dashboard",
+  "submit",
+  "track",
+  "notifications",
+  "schedule",
+  "leaderboard",
+];
+
+function getSavedBarangaySection() {
+  const savedSection = localStorage.getItem(BARANGAY_ACTIVE_SECTION_KEY);
+
+  if (VALID_BARANGAY_SECTIONS.includes(savedSection)) {
+    return savedSection;
+  }
+
+  return "dashboard";
+}
+
 export default function BarangayPortal() {
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(getSavedBarangaySection);
   const [searchTerm, setSearchTerm] = useState("");
   const [profile, setProfile] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -37,6 +58,14 @@ export default function BarangayPortal() {
   useEffect(() => {
     loadProfileAndRequests();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(BARANGAY_ACTIVE_SECTION_KEY, activeSection);
+
+    if (activeSection !== "track") {
+      setSearchTerm("");
+    }
+  }, [activeSection]);
 
   async function loadProfileAndRequests() {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -59,6 +88,7 @@ export default function BarangayPortal() {
     if (error || !profileData) {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(BARANGAY_ACTIVE_SECTION_KEY);
       alert("This account is not registered in the system.");
       window.location.href = "/";
       return;
@@ -67,6 +97,7 @@ export default function BarangayPortal() {
     if (profileData.role !== "barangay_user") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(BARANGAY_ACTIVE_SECTION_KEY);
       alert("Access denied. This account is not allowed to open Barangay Portal.");
       window.location.href = "/";
       return;
@@ -75,6 +106,7 @@ export default function BarangayPortal() {
     if (profileData.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
+      localStorage.removeItem(BARANGAY_ACTIVE_SECTION_KEY);
       alert("Your account is not active. Please contact the LGU Admin.");
       window.location.href = "/";
       return;
@@ -83,7 +115,6 @@ export default function BarangayPortal() {
     setProfile(profileData);
     fetchRequests(profileData.barangay);
 
-    // Schedule-based waste segregation reminder.
     await createBarangayScheduleReminder(profileData);
   }
 
@@ -105,6 +136,7 @@ export default function BarangayPortal() {
   async function handleLogout() {
     await supabase.auth.signOut();
     localStorage.removeItem("pendingRole");
+    localStorage.removeItem(BARANGAY_ACTIVE_SECTION_KEY);
     window.location.href = "/";
   }
 

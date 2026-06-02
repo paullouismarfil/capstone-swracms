@@ -1,6 +1,52 @@
 import { useMemo, useState } from "react";
 import { Printer, FileText } from "lucide-react";
 
+const WASTE_TYPE_CONFIG = {
+  Recyclable: {
+    color: "#16a34a",
+    category: "Recyclable",
+  },
+  Plastic: {
+    color: "#2563eb",
+    category: "Recyclable",
+  },
+  Metal: {
+    color: "#0d9488",
+    category: "Recyclable",
+  },
+  Glass: {
+    color: "#0891b2",
+    category: "Recyclable",
+  },
+  Biodegradable: {
+    color: "#f97316",
+    category: "Non-Recyclable",
+  },
+  Residual: {
+    color: "#dc2626",
+    category: "Non-Recyclable",
+  },
+  "Mixed Waste": {
+    color: "#4b5563",
+    category: "Non-Recyclable",
+  },
+  Unspecified: {
+    color: "#94a3b8",
+    category: "Unspecified",
+  },
+};
+
+const WASTE_TYPE_ORDER = [
+  "Recyclable",
+  "Plastic",
+  "Metal",
+  "Glass",
+  "Biodegradable",
+  "Residual",
+  "Mixed Waste",
+  "Unspecified",
+];
+
 export default function MonthlyPrintableReport({ records = [] }) {
   const today = new Date();
 
@@ -32,13 +78,27 @@ export default function MonthlyPrintableReport({ records = [] }) {
 
   const wasteChartData = useMemo(() => {
     return Object.entries(wasteTypeSummary)
-      .map(([type, kg]) => ({
-        type,
-        kg,
-        percent: totalKg > 0 ? Math.round((kg / totalKg) * 100) : 0,
-        category: isRecyclable(type) ? "Recyclable" : "Non-Recyclable",
-      }))
-      .sort((a, b) => b.kg - a.kg);
+      .map(([rawType, kg]) => {
+        const type = normalizeWasteType(rawType);
+        const config = getWasteTypeConfig(type);
+
+        return {
+          type,
+          kg,
+          percent: totalKg > 0 ? Math.round((kg / totalKg) * 100) : 0,
+          category: config.category,
+          color: config.color,
+        };
+      })
+      .sort((a, b) => {
+        const aIndex = WASTE_TYPE_ORDER.indexOf(a.type);
+        const bIndex = WASTE_TYPE_ORDER.indexOf(b.type);
+
+        const safeAIndex = aIndex === -1 ? 999 : aIndex;
+        const safeBIndex = bIndex === -1 ? 999 : bIndex;
+
+        return safeAIndex - safeBIndex;
+      });
   }, [wasteTypeSummary, totalKg]);
 
   const recyclableKg = wasteChartData
@@ -161,7 +221,7 @@ export default function MonthlyPrintableReport({ records = [] }) {
           <ReportBox label="Total Records" value={filteredRecords.length} />
           <ReportBox
             label="Total Waste Collected"
-            value={`${totalKg.toFixed(2)} kg`}
+            value={`${formatKg(totalKg)} kg`}
           />
           <ReportBox
             label="Barangays / Routes Served"
@@ -173,11 +233,11 @@ export default function MonthlyPrintableReport({ records = [] }) {
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
           <ReportBox
             label="Recyclable Waste"
-            value={`${recyclableKg.toFixed(2)} kg`}
+            value={`${formatKg(recyclableKg)} kg`}
           />
           <ReportBox
             label="Non-Recyclable Waste"
-            value={`${nonRecyclableKg.toFixed(2)} kg`}
+            value={`${formatKg(nonRecyclableKg)} kg`}
           />
           <ReportBox
             label="Recyclable Percentage"
@@ -215,7 +275,7 @@ export default function MonthlyPrintableReport({ records = [] }) {
                 </div>
 
                 <div className="space-y-3">
-                  {wasteChartData.map((item, index) => (
+                  {wasteChartData.map((item) => (
                     <div
                       key={item.type}
                       className="flex items-center justify-between gap-3 border rounded-2xl p-3"
@@ -223,11 +283,8 @@ export default function MonthlyPrintableReport({ records = [] }) {
                       <div className="flex items-center gap-3 min-w-0">
                         <span
                           className="w-4 h-4 rounded-full shrink-0"
-                          style={{
-                            backgroundColor:
-                              PIE_COLORS[index % PIE_COLORS.length],
-                          }}
-                        ></span>
+                          style={{ backgroundColor: item.color }}
+                        />
 
                         <div className="min-w-0">
                           <p className="text-sm font-semibold truncate">
@@ -241,7 +298,7 @@ export default function MonthlyPrintableReport({ records = [] }) {
 
                       <div className="text-right shrink-0">
                         <p className="text-sm font-bold">
-                          {item.kg.toFixed(2)} kg
+                          {formatKg(item.kg)} kg
                         </p>
                         <p className="text-xs text-gray-500">
                           {item.percent}%
@@ -280,21 +337,34 @@ export default function MonthlyPrintableReport({ records = [] }) {
 
                 {wasteChartData.map((item) => (
                   <tr key={item.type} className="border-t">
-                    <td className="p-3">{item.type}</td>
                     <td className="p-3">
-                      {item.category === "Recyclable" ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                          Recyclable
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                          Non-Recyclable
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span>{item.type}</span>
+                      </div>
                     </td>
+
+                    <td className="p-3">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          item.category === "Recyclable"
+                            ? "bg-green-100 text-green-700"
+                            : item.category === "Non-Recyclable"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {item.category}
+                      </span>
+                    </td>
+
                     <td className="p-3 font-semibold">
-                      {item.kg.toFixed(2)} kg
+                      {formatKg(item.kg)} kg
                     </td>
+
                     <td className="p-3 font-semibold">{item.percent}%</td>
                   </tr>
                 ))}
@@ -332,7 +402,7 @@ export default function MonthlyPrintableReport({ records = [] }) {
                     <td className="p-3">
                       {record.request_id
                         ? `CR-${formatShortId(record.request_id)}`
-                        : "N/A"}
+                        : "Manual Record"}
                     </td>
 
                     <td className="p-3">
@@ -344,11 +414,11 @@ export default function MonthlyPrintableReport({ records = [] }) {
                     </td>
 
                     <td className="p-3">
-                      {record.waste_type || "Unspecified"}
+                      {normalizeWasteType(record.waste_type || "Unspecified")}
                     </td>
 
                     <td className="p-3 font-semibold">
-                      {parseKg(record.actual_weight).toFixed(2)} kg
+                      {formatKg(record.actual_weight)} kg
                     </td>
                   </tr>
                 ))}
@@ -427,7 +497,7 @@ function WastePieChart({ data, totalKg }) {
           strokeWidth={strokeWidth}
         />
 
-        {data.map((item, index) => {
+        {data.map((item) => {
           const percent = totalKg > 0 ? item.kg / totalKg : 0;
           const dash = percent * circumference;
           const gap = circumference - dash;
@@ -442,7 +512,7 @@ function WastePieChart({ data, totalKg }) {
               cy={center}
               r={radius}
               fill="none"
-              stroke={PIE_COLORS[index % PIE_COLORS.length]}
+              stroke={item.color}
               strokeWidth={strokeWidth}
               strokeDasharray={`${dash} ${gap}`}
               strokeDashoffset={offset}
@@ -461,7 +531,7 @@ function WastePieChart({ data, totalKg }) {
           className="fill-gray-900"
           style={{ fontSize: "22px", fontWeight: "700" }}
         >
-          {totalKg.toFixed(0)}
+          {formatKg(totalKg)}
         </text>
 
         <text
@@ -493,7 +563,8 @@ function calculateWasteTypeSummary(records) {
     const types = splitWasteTypes(record.waste_type);
     const kgPerType = types.length > 0 ? kg / types.length : kg;
 
-    types.forEach((type) => {
+    types.forEach((rawType) => {
+      const type = normalizeWasteType(rawType);
       acc[type] = (acc[type] || 0) + kgPerType;
     });
 
@@ -519,12 +590,48 @@ function parseKg(value) {
   return Number(number) || 0;
 }
 
-function isRecyclable(type) {
-  const recyclableTypes = ["recyclable", "plastic", "metal", "glass"];
+function formatKg(value) {
+  const number = parseKg(value);
 
+  if (Number.isInteger(number)) {
+    return String(number);
+  }
+
+  return String(Number(number.toFixed(2)));
+}
+
+function normalizeWasteType(type) {
+  const lower = String(type || "").trim().toLowerCase();
+
+  if (lower.includes("plastic")) return "Plastic";
+  if (lower.includes("metal")) return "Metal";
+  if (lower.includes("glass")) return "Glass";
+  if (lower.includes("bio")) return "Biodegradable";
+  if (lower.includes("residual")) return "Residual";
+  if (lower.includes("mixed")) return "Mixed Waste";
+  if (lower.includes("recyclable")) return "Recyclable";
+
+  return String(type || "Unspecified").trim() || "Unspecified";
+}
+
+function getWasteTypeConfig(type) {
+  return (
+    WASTE_TYPE_CONFIG[type] || {
+      color: "#94a3b8",
+      category: isRecyclable(type) ? "Recyclable" : "Non-Recyclable",
+    }
+  );
+}
+
+function isRecyclable(type) {
   const lower = String(type || "").toLowerCase();
 
-  return recyclableTypes.some((keyword) => lower.includes(keyword));
+  return (
+    lower.includes("recyclable") ||
+    lower.includes("plastic") ||
+    lower.includes("metal") ||
+    lower.includes("glass")
+  );
 }
 
 function formatShortId(value) {
@@ -548,17 +655,6 @@ function formatDate(dateValue) {
     day: "numeric",
   });
 }
-
-const PIE_COLORS = [
-  "#16a34a",
-  "#2563eb",
-  "#f97316",
-  "#dc2626",
-  "#7c3aed",
-  "#0891b2",
-  "#ca8a04",
-  "#4b5563",
-];
 
 const monthNames = [
   "January",
