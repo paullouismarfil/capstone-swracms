@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import NotificationsPage from "../components/NotificationsPage";
+import EcoBot from "../components/chatbot/EcoBot";
 import {
   searchCollectionRequests,
   searchWasteRecords,
@@ -492,6 +493,7 @@ export default function CollectionStaffPortal() {
           }
         `}</style>
       </main>
+      <EcoBot role="Collection Staff" botName="Smart Assist" />
     </div>
   );
 }

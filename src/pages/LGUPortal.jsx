@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import LGUSidebar from "../components/lgu/LGUSidebar";
+import EcoBot from "../components/chatbot/EcoBot";
 import ReportsTable from "../components/lgu/ReportsTable";
 import NotificationsPage from "../components/NotificationsPage";
 import LGUTopHeader from "../components/lgu/LGUTopHeader";
@@ -19,10 +20,32 @@ import { searchCollectionRequests } from "../utils/searchHelpers";
 import { collectionSchedule } from "../data/collectionSchedule";
 import { supabase } from "../lib/supabase";
 
+const LGU_ACTIVE_SECTION_KEY = "lguActiveSection";
+
+const VALID_LGU_SECTIONS = [
+  "dashboard",
+  "reports",
+  "notifications",
+  "schedule",
+  "analytics",
+  "monthly_reports",
+  "map",
+  "leaderboard",
+  "users",
+];
+
+function getSavedLGUSection() {
+  const savedSection = localStorage.getItem(LGU_ACTIVE_SECTION_KEY);
+
+  if (VALID_LGU_SECTIONS.includes(savedSection)) {
+    return savedSection;
+  }
+
+  return "dashboard";
+}
+
 export default function LGUPortal() {
-  const [activeSection, setActiveSection] = useState(() => {
-    return localStorage.getItem("lguActiveSection") || "dashboard";
-  });
+  const [activeSection, setActiveSection] = useState(getSavedLGUSection);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [requests, setRequests] = useState([]);
@@ -39,7 +62,11 @@ export default function LGUPortal() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("lguActiveSection", activeSection);
+    localStorage.setItem(LGU_ACTIVE_SECTION_KEY, activeSection);
+
+    if (activeSection !== "reports") {
+      setSearchTerm("");
+    }
   }, [activeSection]);
 
   async function loadAdminProfile() {
@@ -63,7 +90,7 @@ export default function LGUPortal() {
     if (error || !profileData) {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
-      localStorage.removeItem("lguActiveSection");
+      localStorage.removeItem(LGU_ACTIVE_SECTION_KEY);
       alert("This account is not registered in the system.");
       window.location.href = "/";
       return;
@@ -72,7 +99,7 @@ export default function LGUPortal() {
     if (profileData.role !== "lgu_admin") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
-      localStorage.removeItem("lguActiveSection");
+      localStorage.removeItem(LGU_ACTIVE_SECTION_KEY);
       alert("Access denied. This account is not allowed to open MENRO Admin Portal.");
       window.location.href = "/";
       return;
@@ -81,7 +108,7 @@ export default function LGUPortal() {
     if (profileData.status !== "active") {
       await supabase.auth.signOut();
       localStorage.removeItem("pendingRole");
-      localStorage.removeItem("lguActiveSection");
+      localStorage.removeItem(LGU_ACTIVE_SECTION_KEY);
       alert("Your account is not active. Please contact the MENRO Admin.");
       window.location.href = "/";
       return;
@@ -95,7 +122,7 @@ export default function LGUPortal() {
   async function handleLogout() {
     await supabase.auth.signOut();
     localStorage.removeItem("pendingRole");
-    localStorage.removeItem("lguActiveSection");
+    localStorage.removeItem(LGU_ACTIVE_SECTION_KEY);
     window.location.href = "/";
   }
 
@@ -184,7 +211,9 @@ export default function LGUPortal() {
   }
 
   async function updateRequestStatus(id, status) {
-    const requestData = requests.find((r) => r.id === id);
+    const requestData = requests.find(
+      (request) => String(request.id) === String(id)
+    );
 
     if (!requestData) {
       alert("Request not found.");
@@ -192,8 +221,8 @@ export default function LGUPortal() {
     }
 
     if (
-      requestData.status === "Collected" ||
-      requestData.status === "Improper Segregation"
+      normalizeStatus(requestData.status) === "collected" ||
+      normalizeStatus(requestData.status) === "improper segregation"
     ) {
       alert("This request is already finalized and can no longer be changed.");
       return;
@@ -230,8 +259,9 @@ export default function LGUPortal() {
         {
           role: "collector",
           title: "New Pickup Schedule",
-          message: `${requestData?.barangay || "Barangay"
-            } request is now scheduled for collection.`,
+          message: `${
+            requestData?.barangay || "Barangay"
+          } request is now scheduled for collection.`,
           type: "collection_schedule",
           is_read: false,
         },
@@ -243,8 +273,9 @@ export default function LGUPortal() {
         {
           role: "lgu_admin",
           title: "Collection Completed",
-          message: `${requestData?.barangay || "Barangay"
-            } request has been marked as collected.`,
+          message: `${
+            requestData?.barangay || "Barangay"
+          } request has been marked as collected.`,
           type: "collection_complete",
           is_read: false,
         },
@@ -258,9 +289,13 @@ export default function LGUPortal() {
   }
 
   const totalReports = requests.length;
-  const pendingRequests = requests.filter((r) => r.status === "Pending").length;
+
+  const pendingRequests = requests.filter(
+    (request) => normalizeStatus(request.status) === "pending"
+  ).length;
+
   const scheduledRequests = requests.filter(
-    (r) => r.status === "Scheduled"
+    (request) => normalizeStatus(request.status) === "scheduled"
   ).length;
 
   const analytics = useMemo(
@@ -376,10 +411,10 @@ export default function LGUPortal() {
               </h3>
 
               <p className="text-sm text-gray-500 mb-5">
-                Barangay performance is based on useful recyclable and recoverable
-                materials, not on the highest total garbage volume. The ranking rewards
-                plastic, metal, glass, and recyclable waste that can still be reused,
-                recycled, or sold.
+                Barangay performance is based on useful recyclable and
+                recoverable materials, not on the highest total garbage volume.
+                The ranking rewards plastic, metal, glass, and recyclable waste
+                that can still be reused, recycled, or sold.
               </p>
 
               <MiniBadge label="Plastic Collected" value="+3 pts per kg" />
@@ -411,6 +446,8 @@ export default function LGUPortal() {
           />
         )}
       </main>
+
+      <EcoBot role="LGU Admin" botName="Smart Assist" />
     </div>
   );
 }
@@ -422,6 +459,10 @@ function MiniBadge({ label, value }) {
       <p className="font-bold text-green-700">{value}</p>
     </div>
   );
+}
+
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function getPercent(value, total) {
@@ -478,9 +519,9 @@ function calculateWasteAnalytics(records) {
     const date = record.collected_date || record.created_at;
     const month = date
       ? new Date(date).toLocaleDateString("en-PH", {
-        month: "long",
-        year: "numeric",
-      })
+          month: "long",
+          year: "numeric",
+        })
       : "Unspecified";
 
     monthMap[month] = (monthMap[month] || 0) + kg;

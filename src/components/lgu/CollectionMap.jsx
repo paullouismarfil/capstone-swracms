@@ -30,6 +30,33 @@ const blueIcon = new L.Icon({
   iconAnchor: [12, 41],
 });
 
+const yellowIcon = new L.Icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+const redIcon = new L.Icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+const greyIcon = new L.Icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
 export default function CollectionMap({ requests = [] }) {
   const sibalomCenter = [10.7903, 122.0176];
   const [barangayLocations, setBarangayLocations] = useState([]);
@@ -53,13 +80,9 @@ export default function CollectionMap({ requests = [] }) {
     setBarangayLocations(data || []);
   }
 
-  const visibleRequests = requests.filter((request) => {
-    if (request.status !== "Collected") return true;
+  const currentBarangayRequests = getCurrentBarangayRequests(requests);
 
-    return !isCollectedExpired(request);
-  });
-
-  const mapPoints = visibleRequests
+  const mapPoints = currentBarangayRequests
     .map((request) => {
       const foundLocation = findBarangayLocation(
         request.barangay,
@@ -70,45 +93,59 @@ export default function CollectionMap({ requests = [] }) {
         return null;
       }
 
+      const status = normalizeStatus(request.status);
+      const displayStatus = getDisplayStatus(status);
+
       return {
         id: request.id,
         barangay:
           request.barangay || foundLocation?.barangay || "Unknown Barangay",
-        status: request.status || "Pending",
+        status,
+        displayStatus,
         waste: request.waste_type || "Unspecified",
         weight:
           request.estimated_weight ||
           request.actual_weight ||
           request.weight ||
+          request.quantity ||
           "N/A",
         collectionPoint: request.collection_point || "N/A",
-        position: [foundLocation.latitude, foundLocation.longitude],
+        position: [
+          Number(foundLocation.latitude),
+          Number(foundLocation.longitude),
+        ],
         statusUpdatedAt:
           request.status_updated_at || request.updated_at || request.created_at,
+        zIndexOffset: getMarkerZIndex(status),
       };
     })
     .filter(Boolean);
 
-  function getIcon(status) {
-    if (status === "Collected") return greenIcon;
-    if (status === "Scheduled") return blueIcon;
-    return orangeIcon;
-  }
+  const pendingCount = mapPoints.filter((p) => p.status === "pending").length;
 
-  function getCircleColor(status) {
-    if (status === "Collected") return "#16a34a";
-    if (status === "Scheduled") return "#2563eb";
-    return "#f97316";
-  }
+  const scheduledCount = mapPoints.filter(
+    (p) => p.status === "scheduled"
+  ).length;
 
-  const collectedCount = mapPoints.filter((p) => p.status === "Collected").length;
-  const scheduledCount = mapPoints.filter((p) => p.status === "Scheduled").length;
-  const pendingCount = mapPoints.filter((p) => p.status === "Pending").length;
+  const inProgressCount = mapPoints.filter(
+    (p) => p.status === "in progress"
+  ).length;
+
+  const collectedCount = mapPoints.filter(
+    (p) => p.status === "collected"
+  ).length;
+
+  const missedCount = mapPoints.filter((p) => p.status === "missed").length;
+
+  const improperCount = mapPoints.filter(
+    (p) => p.status === "improper segregation"
+  ).length;
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
       <div className="p-6 border-b">
         <h3 className="text-2xl font-bold">Collection Monitoring Map</h3>
+
         <p className="text-gray-500 mt-1">
           Monitor barangay collection points, pickup requests, and current
           status.
@@ -132,6 +169,7 @@ export default function CollectionMap({ requests = [] }) {
               key={point.id}
               position={point.position}
               icon={getIcon(point.status)}
+              zIndexOffset={point.zIndexOffset}
             >
               <Popup>
                 <div className="space-y-2 min-w-[190px]">
@@ -140,7 +178,7 @@ export default function CollectionMap({ requests = [] }) {
                   </h4>
 
                   <p>
-                    <strong>Status:</strong> {point.status}
+                    <strong>Status:</strong> {point.displayStatus}
                   </p>
 
                   <p>
@@ -155,10 +193,10 @@ export default function CollectionMap({ requests = [] }) {
                     <strong>Estimated:</strong> {formatKg(point.weight)}
                   </p>
 
-                  {point.status === "Collected" && (
+                  {point.status === "collected" && (
                     <p className="text-xs text-gray-500">
-                      This collected marker will automatically disappear after
-                      24 hours.
+                      This barangay currently has no newer active request. The
+                      collected marker will disappear after 24 hours.
                     </p>
                   )}
                 </div>
@@ -184,13 +222,128 @@ export default function CollectionMap({ requests = [] }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 border-t bg-gray-50">
-        <MapStat label="Collected" value={collectedCount} color="green" />
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-6 border-t bg-gray-50">
         <MapStat label="Pending" value={pendingCount} color="orange" />
         <MapStat label="Scheduled" value={scheduledCount} color="blue" />
+        <MapStat label="In Progress" value={inProgressCount} color="yellow" />
+        <MapStat label="Collected" value={collectedCount} color="green" />
+        <MapStat label="Missed" value={missedCount} color="gray" />
+        <MapStat label="Improper" value={improperCount} color="red" />
       </div>
     </div>
   );
+}
+
+function getCurrentBarangayRequests(requests) {
+  const barangayMap = {};
+
+  requests.forEach((request) => {
+    const barangayKey = normalizeBarangayName(request.barangay);
+
+    if (!barangayKey) return;
+
+    if (!barangayMap[barangayKey]) {
+      barangayMap[barangayKey] = [];
+    }
+
+    barangayMap[barangayKey].push(request);
+  });
+
+  return Object.values(barangayMap)
+    .map((barangayRequests) => {
+      const sortedRequests = [...barangayRequests].sort((a, b) => {
+        const aDate = getRequestTime(a);
+        const bDate = getRequestTime(b);
+
+        return bDate - aDate;
+      });
+
+      const latestActiveRequest = sortedRequests.find((request) => {
+        const status = normalizeStatus(request.status);
+
+        return (
+          status === "pending" ||
+          status === "scheduled" ||
+          status === "in progress"
+        );
+      });
+
+      if (latestActiveRequest) {
+        return latestActiveRequest;
+      }
+
+      const latestRequest = sortedRequests[0];
+
+      if (!latestRequest) return null;
+
+      const latestStatus = normalizeStatus(latestRequest.status);
+
+      if (latestStatus === "collected" && !isCollectedExpired(latestRequest)) {
+        return latestRequest;
+      }
+
+      if (
+        latestStatus === "missed" ||
+        latestStatus === "improper segregation"
+      ) {
+        return latestRequest;
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function getRequestTime(request) {
+  return new Date(
+    request.status_updated_at || request.updated_at || request.created_at || 0
+  ).getTime();
+}
+
+function getIcon(status) {
+  if (status === "collected") return greenIcon;
+  if (status === "scheduled") return blueIcon;
+  if (status === "in progress") return yellowIcon;
+  if (status === "missed") return greyIcon;
+  if (status === "improper segregation") return redIcon;
+
+  return orangeIcon;
+}
+
+function getCircleColor(status) {
+  if (status === "collected") return "#16a34a";
+  if (status === "scheduled") return "#2563eb";
+  if (status === "in progress") return "#eab308";
+  if (status === "missed") return "#6b7280";
+  if (status === "improper segregation") return "#dc2626";
+
+  return "#f97316";
+}
+
+function getDisplayStatus(status) {
+  if (status === "pending") return "Pending";
+  if (status === "scheduled") return "Scheduled";
+  if (status === "in progress") return "In Progress";
+  if (status === "collected") return "Collected";
+  if (status === "missed") return "Missed";
+  if (status === "improper segregation") return "Improper Segregation";
+
+  return "Pending";
+}
+
+function getMarkerZIndex(status) {
+  if (status === "pending") return 600;
+  if (status === "scheduled") return 500;
+  if (status === "in progress") return 400;
+  if (status === "collected") return 300;
+  if (status === "missed") return 200;
+  if (status === "improper segregation") return 100;
+
+  return 50;
+}
+
+function normalizeStatus(value) {
+  return String(value || "Pending").trim().toLowerCase();
 }
 
 function isCollectedExpired(request) {
@@ -230,11 +383,15 @@ function MapStat({ label, value, color }) {
     green: "text-green-700 bg-green-100",
     orange: "text-orange-600 bg-orange-100",
     blue: "text-blue-700 bg-blue-100",
+    yellow: "text-yellow-700 bg-yellow-100",
+    gray: "text-gray-700 bg-gray-100",
+    red: "text-red-700 bg-red-100",
   };
 
   return (
     <div className="bg-white rounded-2xl border p-4">
       <p className="text-sm text-gray-500">{label}</p>
+
       <div
         className={`mt-2 w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-xl ${colors[color]}`}
       >

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { findBarangaySchedule } from "../data/collectionSchedule";
+import EcoBot from "../components/chatbot/EcoBot";
 import { searchCollectionRequests } from "../utils/searchHelpers";
 import { createBarangayScheduleReminder } from "../utils/scheduleReminderHelper";
 import NotificationsPage from "../components/NotificationsPage";
@@ -316,6 +317,7 @@ export default function BarangayPortal() {
           }
         `}</style>
       </main>
+      <EcoBot role="Barangay User" botName="Smart Assist" />
     </div>
   );
 }
