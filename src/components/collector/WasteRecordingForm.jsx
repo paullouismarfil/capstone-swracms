@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Camera, Send, ClipboardList, FilePlus2 } from "lucide-react";
+import {
+  Camera,
+  Send,
+  ClipboardList,
+  FilePlus2,
+  Truck,
+  AlertTriangle,
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import FormInput from "./FormInput";
 import { allSibalomBarangays } from "../../data/collectionSchedule";
@@ -44,7 +51,7 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
   );
 
   const editableRequests = requests.filter(
-    (request) => request.status !== "Collected"
+    (request) => request.status !== "Collected" && !request.needsReschedule
   );
 
   const barangayOptions = allSibalomBarangays;
@@ -53,6 +60,13 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
     (sum, entry) => sum + parseKg(entry.weight),
     0
   );
+
+  const vehicleUsed =
+    recordMode === "request" && selectedRequest?.assignedTruck
+      ? `${selectedRequest.assignedTruck.name} - ${
+          selectedRequest.assignedTruck.shortLabel || "Assigned Truck"
+        }`
+      : "LGU Garbage Truck";
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -91,14 +105,22 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
       return;
     }
 
+    if (request.needsReschedule) {
+      setMessage(
+        "This request needs rescheduling and cannot be recorded until MENRO assigns a new schedule or available truck."
+      );
+      setMessageType("error");
+      return;
+    }
+
     const selectedTypes = splitWasteTypes(request.waste_type);
 
     const initialEntries =
       selectedTypes.length > 0
         ? selectedTypes.map((type) => ({
-          type,
-          weight: "",
-        }))
+            type,
+            weight: "",
+          }))
         : [];
 
     setForm((prev) => ({
@@ -132,9 +154,9 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
       prev.map((entry) =>
         entry.type === type
           ? {
-            ...entry,
-            weight: value,
-          }
+              ...entry,
+              weight: value,
+            }
           : entry
       )
     );
@@ -260,6 +282,14 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
       return;
     }
 
+    if (recordMode === "request" && selectedRequest.needsReschedule) {
+      setMessage(
+        "This request needs rescheduling and cannot be recorded until MENRO assigns a new schedule or available truck."
+      );
+      setMessageType("error");
+      return;
+    }
+
     if (recordMode === "request" && selectedRequest.status === "Collected") {
       setMessage(
         "This request is already collected and can no longer be recorded again."
@@ -319,7 +349,7 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
           waste_type: entry.type,
           actual_weight: entry.weight,
           collected_date: collectedDate,
-          vehicle: "LGU Garbage Truck",
+          vehicle: vehicleUsed,
           remarks: form.remarks,
           photo_url: photoUrl,
           recorded_by: recorderProfileId,
@@ -344,8 +374,9 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
           notificationRows.push({
             user_id: selectedRequest.submitted_by,
             title: "Waste Successfully Collected",
-            message: `${selectedRequest?.barangay || "Barangay"
-              } waste request has been collected by MENRO.`,
+            message: `${
+              selectedRequest?.barangay || "Barangay"
+            } waste request has been collected by MENRO.`,
             type: "collection_complete",
             is_read: false,
           });
@@ -354,8 +385,9 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
         notificationRows.push({
           role: "lgu_admin",
           title: "Collection Completed",
-          message: `${selectedRequest?.barangay || "Barangay"
-            } request has been completed by collection staff.`,
+          message: `${
+            selectedRequest?.barangay || "Barangay"
+          } request has been completed by collection staff using ${vehicleUsed}.`,
           type: "collection_complete",
           is_read: false,
         });
@@ -482,10 +514,11 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
         <button
           type="button"
           onClick={() => handleModeChange("request")}
-          className={`rounded-2xl border p-4 text-left transition ${recordMode === "request"
+          className={`rounded-2xl border p-4 text-left transition ${
+            recordMode === "request"
               ? "bg-green-50 border-green-300 text-green-800"
               : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-            }`}
+          }`}
         >
           <div className="flex items-center gap-3">
             <ClipboardList size={22} />
@@ -502,10 +535,11 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
         <button
           type="button"
           onClick={() => handleModeChange("manual")}
-          className={`rounded-2xl border p-4 text-left transition ${recordMode === "manual"
+          className={`rounded-2xl border p-4 text-left transition ${
+            recordMode === "manual"
               ? "bg-green-50 border-green-300 text-green-800"
               : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-            }`}
+          }`}
         >
           <div className="flex items-center gap-3">
             <FilePlus2 size={22} />
@@ -519,6 +553,17 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
           </div>
         </button>
       </div>
+
+      {recordMode === "request" && requests.some((r) => r.needsReschedule) && (
+        <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+          <p>
+            Some requests need rescheduling and are hidden from the pickup
+            request list. They must be rescheduled by LGU/MENRO before the
+            collector can record them.
+          </p>
+        </div>
+      )}
 
       {recordMode === "request" && selectedRequest && (
         <div className="mb-6 bg-green-50 border border-green-100 rounded-2xl p-4">
@@ -536,6 +581,43 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
             • {selectedRequest.route_schedule || "No route schedule"}
           </p>
 
+          {selectedRequest.assignedTruck && (
+            <div className="mt-4 rounded-2xl border bg-white p-4 flex items-start gap-3">
+              <div
+                className="h-11 w-11 rounded-2xl text-white flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: selectedRequest.assignedTruck.color || "#15803d",
+                }}
+              >
+                <Truck size={20} />
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500">Assigned Truck</p>
+                <p className="text-sm font-bold text-gray-900 mt-1">
+                  {selectedRequest.assignedTruck.name} -{" "}
+                  {selectedRequest.assignedTruck.label ||
+                    selectedRequest.assignedTruck.shortLabel}
+                </p>
+
+                <p className="text-xs text-gray-600 mt-1">
+                  Vehicle Used:{" "}
+                  <span className="font-semibold">{vehicleUsed}</span>
+                </p>
+
+                {selectedRequest.isReassignedToBackup && (
+                  <p className="text-xs font-semibold text-red-600 mt-2">
+                    Backup route from{" "}
+                    {selectedRequest.originalAssignedTruck?.name ||
+                      "main truck"}
+                    . This request was reassigned because the original truck is
+                    unavailable.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <MiniInfo
               label="Barangay"
@@ -551,10 +633,10 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
               label="Estimated Weight"
               value={`${formatKg(
                 selectedRequest.actual_weight ||
-                selectedRequest.estimated_weight ||
-                selectedRequest.weight ||
-                selectedRequest.quantity ||
-                0
+                  selectedRequest.estimated_weight ||
+                  selectedRequest.weight ||
+                  selectedRequest.quantity ||
+                  0
               )} kg`}
             />
           </div>
@@ -563,10 +645,11 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
 
       {message && (
         <div
-          className={`mb-5 px-4 py-3 rounded-2xl text-sm ${messageType === "success"
+          className={`mb-5 px-4 py-3 rounded-2xl text-sm ${
+            messageType === "success"
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
-            }`}
+          }`}
         >
           {message}
         </div>
@@ -589,7 +672,10 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
               {editableRequests.map((request) => (
                 <option key={request.id} value={request.id}>
                   CR-{String(request.id).padStart(3, "0")} - {request.barangay} -{" "}
-                  {request.schedule_group || "No Route"} - {request.status}
+                  {request.assignedTruck
+                    ? `${request.assignedTruck.name}`
+                    : request.schedule_group || "No Route"}{" "}
+                  - {request.status}
                 </option>
               ))}
             </select>
@@ -658,10 +744,11 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
                 return (
                   <div
                     key={type}
-                    className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 items-center rounded-2xl border px-4 py-3 transition ${checked
+                    className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 items-center rounded-2xl border px-4 py-3 transition ${
+                      checked
                         ? "bg-green-50 border-green-300"
                         : "bg-white border-gray-200"
-                      }`}
+                    }`}
                   >
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -672,8 +759,9 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
                       />
 
                       <span
-                        className={`text-sm font-semibold ${checked ? "text-green-800" : "text-gray-700"
-                          }`}
+                        className={`text-sm font-semibold ${
+                          checked ? "text-green-800" : "text-gray-700"
+                        }`}
                       >
                         {type}
                       </span>
@@ -721,9 +809,9 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
         <FormInput
           label="Vehicle Used"
           placeholder="LGU Garbage Truck"
-          value="LGU Garbage Truck"
+          value={vehicleUsed}
           readOnly
-          onChange={() => { }}
+          onChange={() => {}}
         />
 
         {recordMode === "request" && (
@@ -826,7 +914,7 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
         <div className="md:col-span-2 flex justify-end">
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || (recordMode === "request" && selectedRequest?.needsReschedule)}
             onClick={handleSaveRecord}
             className="bg-green-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-2xl shadow hover:bg-green-800 flex items-center gap-2"
           >
@@ -834,8 +922,8 @@ export default function WasteRecordingForm({ requests, onSuccess }) {
             {saving
               ? "Saving..."
               : recordMode === "manual"
-                ? "Save Manual Record"
-                : "Save Waste Record"}
+              ? "Save Manual Record"
+              : "Save Waste Record"}
           </button>
         </div>
       </form>

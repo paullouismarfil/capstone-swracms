@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Trash2,
   Scale,
+  Truck,
 } from "lucide-react";
 
 export default function QuickStatusUpdate({ requests, onStatusChange }) {
@@ -18,7 +19,8 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
   const editableRequests = requests.filter(
     (request) =>
       request.status !== "Collected" &&
-      request.status !== "Improper Segregation"
+      request.status !== "Improper Segregation" &&
+      !request.needsReschedule
   );
 
   const selectedRequest = requests.find(
@@ -37,6 +39,14 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
 
     if (!selectedRequest) {
       setMessage("Selected request was not found.");
+      setMessageType("error");
+      return;
+    }
+
+    if (selectedRequest.needsReschedule) {
+      setMessage(
+        "This request needs rescheduling. Please wait for LGU/MENRO to assign a new schedule or available truck."
+      );
       setMessageType("error");
       return;
     }
@@ -97,11 +107,22 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
         </div>
       )}
 
+      {requests.some((request) => request.needsReschedule) && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm flex items-start gap-2">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+          <p>
+            Some requests need rescheduling because the assigned truck is
+            unavailable and the backup truck is already active. These requests
+            are hidden from quick status updates until MENRO reschedules them.
+          </p>
+        </div>
+      )}
+
       {editableRequests.length === 0 && (
         <div className="mb-4 bg-gray-100 text-gray-600 px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
           <Lock size={16} />
-          No editable pickup requests available. Collected and improper
-          segregation records are finalized.
+          No editable pickup requests available. Collected, improper
+          segregation, and reschedule-required records cannot be updated here.
         </div>
       )}
 
@@ -125,7 +146,10 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
             {editableRequests.map((request) => (
               <option key={request.id} value={request.id}>
                 CR-{String(request.id).padStart(3, "0")} - {request.barangay} -{" "}
-                {request.schedule_group || "No Route"} - {request.status}
+                {request.assignedTruck
+                  ? `${request.assignedTruck.name}`
+                  : request.schedule_group || "No Route"}{" "}
+                - {request.status}
               </option>
             ))}
           </select>
@@ -153,6 +177,60 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
                 {selectedRequest.schedule_group || "No Route"}
               </span>
             </div>
+
+            {selectedRequest.needsReschedule && (
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm flex items-start gap-2">
+                <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Needs Reschedule</p>
+                  <p className="mt-1">
+                    {selectedRequest.rescheduleReason ||
+                      "This request requires LGU/MENRO rescheduling before collection."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedRequest.assignedTruck && (
+              <div className="mt-4 bg-white border rounded-2xl p-4 flex items-start gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor:
+                      selectedRequest.assignedTruck.color || "#15803d",
+                  }}
+                >
+                  <Truck size={18} />
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Assigned Truck</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">
+                    {selectedRequest.assignedTruck.name} -{" "}
+                    {selectedRequest.assignedTruck.label ||
+                      selectedRequest.assignedTruck.shortLabel}
+                  </p>
+
+                  <p className="text-xs text-gray-600 mt-1">
+                    Assigned Waste:{" "}
+                    <span className="font-semibold">
+                      {selectedRequest.assignedTruck.assignedWaste ||
+                        "Not specified"}
+                    </span>
+                  </p>
+
+                  {selectedRequest.isReassignedToBackup && (
+                    <p className="text-xs text-red-600 font-semibold mt-2">
+                      Backup route from{" "}
+                      {selectedRequest.originalAssignedTruck?.name ||
+                        "main truck"}
+                      . This request was reassigned because the original truck is
+                      unavailable.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
               <RequestInfo
@@ -260,11 +338,19 @@ export default function QuickStatusUpdate({ requests, onStatusChange }) {
 
         <button
           onClick={handleUpdate}
-          disabled={!requestId || status === "Collected"}
+          disabled={
+            !requestId ||
+            status === "Collected" ||
+            selectedRequest?.needsReschedule
+          }
           className="w-full bg-green-700 text-white px-5 py-3 rounded-2xl shadow hover:bg-green-800 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <PackageCheck size={18} />
-          {status === "Collected" ? "Use Waste Recording Instead" : "Update Status"}
+          {status === "Collected"
+            ? "Use Waste Recording Instead"
+            : selectedRequest?.needsReschedule
+            ? "Waiting for MENRO Reschedule"
+            : "Update Status"}
         </button>
       </div>
     </div>

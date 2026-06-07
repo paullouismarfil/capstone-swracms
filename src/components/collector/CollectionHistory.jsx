@@ -1,4 +1,5 @@
 import { formatKg } from "./helpers";
+import { Truck } from "lucide-react";
 
 export default function CollectionHistory({ records = [], full }) {
   return (
@@ -21,7 +22,7 @@ export default function CollectionHistory({ records = [], full }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[950px]">
+        <table className="w-full min-w-[1150px]">
           <thead className="bg-gray-50 text-gray-500 text-sm">
             <tr>
               <th className="p-4 text-left">Record ID</th>
@@ -29,6 +30,7 @@ export default function CollectionHistory({ records = [], full }) {
               <th className="p-4 text-left">Route / Barangay</th>
               <th className="p-4 text-left">Waste Type</th>
               <th className="p-4 text-left">Actual Weight</th>
+              <th className="p-4 text-left">Vehicle / Truck Used</th>
               <th className="p-4 text-left">Date</th>
               <th className="p-4 text-left">Photo</th>
               <th className="p-4 text-left">Remarks</th>
@@ -38,7 +40,7 @@ export default function CollectionHistory({ records = [], full }) {
           <tbody>
             {records.length === 0 && (
               <tr>
-                <td className="p-4 text-gray-500" colSpan="8">
+                <td className="p-4 text-gray-500" colSpan="9">
                   No collection records yet.
                 </td>
               </tr>
@@ -56,7 +58,9 @@ export default function CollectionHistory({ records = [], full }) {
                       CR-{formatShortId(record.request_id)}
                     </span>
                   ) : (
-                    <span className="text-gray-400 text-sm">No request ref.</span>
+                    <span className="text-gray-400 text-sm">
+                      No request ref.
+                    </span>
                   )}
                 </td>
 
@@ -70,6 +74,13 @@ export default function CollectionHistory({ records = [], full }) {
 
                 <td className="p-4 font-bold text-green-700">
                   {formatKg(record.actual_weight)}
+                </td>
+
+                <td className="p-4">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    <Truck size={13} />
+                    {record.vehicle || "LGU Garbage Truck"}
+                  </span>
                 </td>
 
                 <td className="p-4 text-gray-500">

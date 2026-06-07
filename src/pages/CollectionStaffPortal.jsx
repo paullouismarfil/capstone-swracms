@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import NotificationsPage from "../components/NotificationsPage";
 import EcoBot from "../components/chatbot/EcoBot";
 import {
@@ -30,6 +30,65 @@ const VALID_COLLECTOR_SECTIONS = [
   "history",
 ];
 
+const DEFAULT_TRUCKS = [
+  {
+    id: "truck_1",
+    truckCode: "truck_1",
+    name: "Truck 1",
+    label: "Recyclable Waste Truck",
+    assignedWaste: "Plastic, Metal, Glass, Paper, Cardboard, Recyclable Waste",
+    shortLabel: "Recyclable",
+    status: "available",
+    color: "#15803d",
+    bgClass: "bg-green-50",
+    textClass: "text-green-700",
+  },
+  {
+    id: "truck_2",
+    truckCode: "truck_2",
+    name: "Truck 2",
+    label: "Biodegradable Waste Truck",
+    assignedWaste: "Food Waste, Leaves, Fruit Peels, Vegetable Scraps",
+    shortLabel: "Biodegradable",
+    status: "available",
+    color: "#ca8a04",
+    bgClass: "bg-yellow-50",
+    textClass: "text-yellow-700",
+  },
+  {
+    id: "truck_3",
+    truckCode: "truck_3",
+    name: "Truck 3",
+    label: "Residual / Non-Biodegradable Truck",
+    assignedWaste: "Residual Waste, Wrappers, Sachets, Non-Recyclable Plastics",
+    shortLabel: "Residual",
+    status: "available",
+    color: "#2563eb",
+    bgClass: "bg-blue-50",
+    textClass: "text-blue-700",
+  },
+  {
+    id: "truck_4",
+    truckCode: "truck_4",
+    name: "Truck 4",
+    label: "Backup / Special Collection Truck",
+    assignedWaste: "Backup, Overflow, Special, Emergency, or Unclassified Waste",
+    shortLabel: "Backup",
+    status: "available",
+    color: "#dc2626",
+    bgClass: "bg-red-50",
+    textClass: "text-red-700",
+  },
+];
+
+const TRUCK_STATUS_OPTIONS = [
+  "available",
+  "on_route",
+  "under_maintenance",
+  "unavailable",
+  "backup_active",
+];
+
 function getSavedCollectorSection() {
   const savedSection = localStorage.getItem(COLLECTOR_ACTIVE_SECTION_KEY);
 
@@ -51,6 +110,9 @@ export default function CollectionStaffPortal() {
   const [collectorProfile, setCollectorProfile] = useState(null);
   const [collectorEmail, setCollectorEmail] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const [collectionTrucks, setCollectionTrucks] = useState(DEFAULT_TRUCKS);
+  const [collectorTruck, setCollectorTruck] = useState(null);
 
   useEffect(() => {
     loadCollectorProfile();
@@ -110,8 +172,32 @@ export default function CollectionStaffPortal() {
     }
 
     setCollectorProfile(profileData);
+
+    const trucks = await fetchCollectionTrucks();
+    const assignedTruck = findCollectorAssignedTruck(trucks, loginEmail);
+
+    setCollectorTruck(assignedTruck || null);
+
     fetchAssignedRequests();
     fetchWasteRecords();
+  }
+
+  async function fetchCollectionTrucks() {
+    const { data, error } = await supabase
+      .from("collection_trucks")
+      .select("*")
+      .order("truck_code", { ascending: true });
+
+    if (error) {
+      console.error("Collection trucks fetch error:", error);
+      setCollectionTrucks(DEFAULT_TRUCKS);
+      return DEFAULT_TRUCKS;
+    }
+
+    const mergedTrucks = mergeTruckData(data || []);
+    setCollectionTrucks(mergedTrucks);
+
+    return mergedTrucks;
   }
 
   async function fetchAssignedRequests() {
@@ -190,6 +276,17 @@ export default function CollectionStaffPortal() {
       return;
     }
 
+    const requestAssignment = requestAssignments.find(
+      (item) => String(item.id) === String(id)
+    );
+
+    if (requestAssignment?.needsReschedule) {
+      alert(
+        "This request needs rescheduling because the assigned truck is unavailable and the backup truck is already active."
+      );
+      return;
+    }
+
     if (
       requestData.status === "Collected" ||
       requestData.status === "Improper Segregation"
@@ -215,8 +312,9 @@ export default function CollectionStaffPortal() {
           {
             user_id: requestData.submitted_by,
             title: "Collection In Progress",
-            message: `${requestData?.barangay || "Barangay"
-              } waste collection is now in progress. Please make sure waste is properly segregated before pickup.`,
+            message: `${
+              requestData?.barangay || "Barangay"
+            } waste collection is now in progress. Please make sure waste is properly segregated before pickup.`,
             type: "collection_progress",
             is_read: false,
           },
@@ -231,8 +329,9 @@ export default function CollectionStaffPortal() {
         notificationRows.push({
           user_id: requestData.submitted_by,
           title: "Waste Not Collected",
-          message: `${requestData?.barangay || "Your barangay"
-            } waste was not collected because it was not properly segregated. Please separate waste according to MENRO guidelines before the next collection schedule.`,
+          message: `${
+            requestData?.barangay || "Your barangay"
+          } waste was not collected because it was not properly segregated. Please separate waste according to MENRO guidelines before the next collection schedule.`,
           type: "improper_segregation",
           is_read: false,
         });
@@ -241,8 +340,9 @@ export default function CollectionStaffPortal() {
       notificationRows.push({
         role: "lgu_admin",
         title: "Improper Waste Segregation",
-        message: `${requestData?.barangay || "Barangay"
-          } was marked as not collected due to improper waste segregation.`,
+        message: `${
+          requestData?.barangay || "Barangay"
+        } was marked as not collected due to improper waste segregation.`,
         type: "improper_segregation",
         is_read: false,
       });
@@ -263,8 +363,9 @@ export default function CollectionStaffPortal() {
         notificationRows.push({
           user_id: requestData.submitted_by,
           title: "Waste Successfully Collected",
-          message: `${requestData?.barangay || "Barangay"
-            } waste request has been collected by MENRO.`,
+          message: `${
+            requestData?.barangay || "Barangay"
+          } waste request has been collected by MENRO.`,
           type: "collection_complete",
           is_read: false,
         });
@@ -273,8 +374,9 @@ export default function CollectionStaffPortal() {
       notificationRows.push({
         role: "lgu_admin",
         title: "Collection Completed",
-        message: `${requestData?.barangay || "Barangay"
-          } request has been completed by collection staff.`,
+        message: `${
+          requestData?.barangay || "Barangay"
+        } request has been completed by collection staff.`,
         type: "collection_complete",
         is_read: false,
       });
@@ -314,18 +416,55 @@ export default function CollectionStaffPortal() {
     alert("Password reset email sent to " + collectorEmail);
   }
 
+  const trucksById = useMemo(() => {
+    return collectionTrucks.reduce((map, truck) => {
+      map[truck.id] = truck;
+      return map;
+    }, {});
+  }, [collectionTrucks]);
+
+  const requestAssignments = useMemo(() => {
+    return assignRequestsToEffectiveTrucks(assignedRequests, trucksById);
+  }, [assignedRequests, trucksById]);
+
+  const collectorAssignedRequests = useMemo(() => {
+    if (!collectorTruck) return [];
+
+    return requestAssignments.filter((request) => {
+      if (request.needsReschedule) return false;
+
+      return request.assignedTruck?.id === collectorTruck.id;
+    });
+  }, [requestAssignments, collectorTruck]);
+
+  const collectorHistoryRecords = useMemo(() => {
+    if (!collectorTruck) return [];
+
+    return historyRecords.filter((record) => {
+      const assignedTruck = getAssignedTruck(record?.waste_type, trucksById);
+      return assignedTruck.id === collectorTruck.id;
+    });
+  }, [historyRecords, collectorTruck, trucksById]);
+
   const routeOptions = [
     "All Routes",
-    ...new Set(assignedRequests.map((r) => r.schedule_group).filter(Boolean)),
+    ...new Set(
+      collectorAssignedRequests.map((r) => r.schedule_group).filter(Boolean)
+    ),
   ];
 
   const filteredRequests =
     selectedRoute === "All Routes"
-      ? assignedRequests
-      : assignedRequests.filter((r) => r.schedule_group === selectedRoute);
+      ? collectorAssignedRequests
+      : collectorAssignedRequests.filter(
+          (r) => r.schedule_group === selectedRoute
+        );
 
   const searchedRequests = searchCollectionRequests(filteredRequests, searchTerm);
-  const searchedHistoryRecords = searchWasteRecords(historyRecords, searchTerm);
+  const searchedHistoryRecords = searchWasteRecords(
+    collectorHistoryRecords,
+    searchTerm
+  );
 
   const inProgressCount = searchedRequests.filter(
     (r) => r.status === "In Progress"
@@ -333,6 +472,10 @@ export default function CollectionStaffPortal() {
 
   const scheduledCount = searchedRequests.filter(
     (r) => r.status === "Scheduled"
+  ).length;
+
+  const needsRescheduleCount = requestAssignments.filter(
+    (request) => request.needsReschedule
   ).length;
 
   const showSearch = ["assigned", "status", "recording", "history"].includes(
@@ -372,11 +515,18 @@ export default function CollectionStaffPortal() {
 
         {activeSection === "dashboard" && (
           <>
+            <CollectorTruckAssignmentCard
+              collectorTruck={collectorTruck}
+              collectorEmail={collectorEmail}
+              assignedCount={collectorAssignedRequests.length}
+              needsRescheduleCount={needsRescheduleCount}
+            />
+
             <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5 mb-6 lg:mb-8">
               <CollectorStatCard
                 title="Assigned Pickups"
                 value={searchedRequests.length}
-                note="Filtered scheduled requests"
+                note="Filtered by assigned truck"
                 icon={<CalendarDays size={26} />}
                 color="blue"
               />
@@ -434,6 +584,13 @@ export default function CollectionStaffPortal() {
 
         {activeSection === "assigned" && (
           <>
+            <CollectorTruckAssignmentCard
+              collectorTruck={collectorTruck}
+              collectorEmail={collectorEmail}
+              assignedCount={collectorAssignedRequests.length}
+              needsRescheduleCount={needsRescheduleCount}
+            />
+
             <RouteFilterPanel
               selectedRoute={selectedRoute}
               setSelectedRoute={setSelectedRoute}
@@ -451,10 +608,19 @@ export default function CollectionStaffPortal() {
         )}
 
         {activeSection === "status" && (
-          <QuickStatusUpdate
-            requests={searchedRequests}
-            onStatusChange={updateRequestStatus}
-          />
+          <>
+            <CollectorTruckAssignmentCard
+              collectorTruck={collectorTruck}
+              collectorEmail={collectorEmail}
+              assignedCount={collectorAssignedRequests.length}
+              needsRescheduleCount={needsRescheduleCount}
+            />
+
+            <QuickStatusUpdate
+              requests={searchedRequests}
+              onStatusChange={updateRequestStatus}
+            />
+          </>
         )}
 
         {activeSection === "notifications" && (
@@ -462,18 +628,36 @@ export default function CollectionStaffPortal() {
         )}
 
         {activeSection === "recording" && (
-          <WasteRecordingForm
-            requests={searchedRequests}
-            onSuccess={() => {
-              fetchAssignedRequests();
-              fetchWasteRecords();
-              setActiveSection("history");
-            }}
-          />
+          <>
+            <CollectorTruckAssignmentCard
+              collectorTruck={collectorTruck}
+              collectorEmail={collectorEmail}
+              assignedCount={collectorAssignedRequests.length}
+              needsRescheduleCount={needsRescheduleCount}
+            />
+
+            <WasteRecordingForm
+              requests={searchedRequests}
+              onSuccess={() => {
+                fetchAssignedRequests();
+                fetchWasteRecords();
+                setActiveSection("history");
+              }}
+            />
+          </>
         )}
 
         {activeSection === "history" && (
-          <CollectionHistory records={searchedHistoryRecords} full />
+          <>
+            <CollectorTruckAssignmentCard
+              collectorTruck={collectorTruck}
+              collectorEmail={collectorEmail}
+              assignedCount={collectorAssignedRequests.length}
+              needsRescheduleCount={needsRescheduleCount}
+            />
+
+            <CollectionHistory records={searchedHistoryRecords} full />
+          </>
         )}
 
         <style>{`
@@ -493,7 +677,323 @@ export default function CollectionStaffPortal() {
           }
         `}</style>
       </main>
+
       <EcoBot role="Collection Staff" botName="Smart Assist" />
     </div>
+  );
+}
+
+function CollectorTruckAssignmentCard({
+  collectorTruck,
+  collectorEmail,
+  assignedCount,
+  needsRescheduleCount,
+}) {
+  const truckUnavailable =
+    collectorTruck &&
+    (collectorTruck.status === "under_maintenance" ||
+      collectorTruck.status === "unavailable");
+
+  if (!collectorTruck) {
+    return (
+      <div className="mb-6 rounded-3xl border border-red-200 bg-red-50 p-5">
+        <p className="text-sm font-bold text-red-700">
+          No truck assigned to this collector account
+        </p>
+        <p className="text-xs text-red-600 mt-1">
+          The logged-in email{" "}
+          <span className="font-semibold">{collectorEmail || "Unknown"}</span>{" "}
+          is not assigned to any collection truck. Please ask the LGU/MENRO
+          Admin to assign this email in the collection_trucks table.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mb-6 rounded-3xl border p-5 ${collectorTruck.bgClass}`}>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div
+            className="h-14 w-14 rounded-2xl text-white flex items-center justify-center text-2xl shadow-sm"
+            style={{ backgroundColor: collectorTruck.color }}
+          >
+            🚛
+          </div>
+
+          <div>
+            <p className={`text-lg font-bold ${collectorTruck.textClass}`}>
+              {collectorTruck.name} - {collectorTruck.label}
+            </p>
+
+            <p className="text-sm text-gray-600 mt-1">
+              Assigned Waste:{" "}
+              <span className="font-semibold">
+                {collectorTruck.assignedWaste}
+              </span>
+            </p>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Truck Status:{" "}
+              <span className="font-semibold">
+                {getTruckStatusLabel(collectorTruck.status)}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white/80 border px-4 py-3">
+          <p className="text-xs text-gray-500">Your Active Tasks</p>
+          <p className={`text-2xl font-bold ${collectorTruck.textClass}`}>
+            {assignedCount}
+          </p>
+        </div>
+      </div>
+
+      {truckUnavailable && collectorTruck.id !== "truck_4" && (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-bold text-red-700">
+            Your assigned truck is currently unavailable
+          </p>
+
+          <p className="text-xs text-red-600 mt-1">
+            {collectorTruck.name} is marked as{" "}
+            <span className="font-semibold">
+              {getTruckStatusLabel(collectorTruck.status)}
+            </span>
+            . Active routes for this truck may be reassigned to Truck 4 Backup
+            or rescheduled by LGU/MENRO. Please wait for MENRO instructions.
+          </p>
+        </div>
+      )}
+
+      {collectorTruck.id === "truck_4" && (
+        <div className="mt-4 rounded-2xl border bg-white/70 px-4 py-3">
+          <p className="text-xs font-semibold text-red-700">
+            Backup Truck Notice
+          </p>
+          <p className="text-xs text-gray-600 mt-1">
+            This truck may receive backup routes when Truck 1, Truck 2, or Truck
+            3 becomes unavailable. If another route needs backup while Truck 4
+            is already active, MENRO must reschedule that route.
+          </p>
+        </div>
+      )}
+
+      {needsRescheduleCount > 0 && (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-xs font-bold text-red-700">
+            {needsRescheduleCount} route
+            {needsRescheduleCount > 1 ? "s" : ""} need rescheduling
+          </p>
+          <p className="text-xs text-red-600 mt-1">
+            These routes are not shown in the collector task list because they
+            require LGU/MENRO rescheduling.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function mergeTruckData(databaseTrucks) {
+  return DEFAULT_TRUCKS.map((defaultTruck) => {
+    const foundTruck = databaseTrucks.find(
+      (truck) => truck.truck_code === defaultTruck.truckCode
+    );
+
+    if (!foundTruck) return defaultTruck;
+
+    return {
+      ...defaultTruck,
+      name: foundTruck.truck_name || defaultTruck.name,
+      assignedWaste: foundTruck.assigned_waste || defaultTruck.assignedWaste,
+      status: normalizeTruckStatus(foundTruck.status),
+      assignedCollectorEmail: String(
+        foundTruck.assigned_collector_email || ""
+      ).toLowerCase(),
+      assignedCollectorName: foundTruck.assigned_collector_name || "",
+      updatedAt: foundTruck.updated_at,
+    };
+  });
+}
+
+function findCollectorAssignedTruck(trucks, email) {
+  const normalizedEmail = String(email || "").toLowerCase();
+
+  return trucks.find(
+    (truck) =>
+      String(truck.assignedCollectorEmail || "").toLowerCase() ===
+      normalizedEmail
+  );
+}
+
+function assignRequestsToEffectiveTrucks(requests, trucksById = {}) {
+  const basicAssignments = requests.map((request) => {
+    const originalAssignedTruck = getAssignedTruck(request.waste_type, trucksById);
+
+    return {
+      ...request,
+      originalAssignedTruck,
+      assignedTruck: originalAssignedTruck,
+      isReassignedToBackup: false,
+      needsReschedule: false,
+      rescheduleReason: "",
+    };
+  });
+
+  const backupTruck = trucksById.truck_4 || DEFAULT_TRUCKS[3];
+
+  const unavailableMainTruckIds = ["truck_1", "truck_2", "truck_3"].filter(
+    (truckId) => {
+      const truck = trucksById[truckId];
+
+      if (!truck || !isTruckUnavailableForRoute(truck.status)) {
+        return false;
+      }
+
+      return basicAssignments.some(
+        (request) =>
+          request.originalAssignedTruck.id === truckId &&
+          isActiveRouteStatus(normalizeStatus(request.status))
+      );
+    }
+  );
+
+  const backupCanBeUsed =
+    backupTruck &&
+    !isTruckUnavailableForRoute(backupTruck.status) &&
+    unavailableMainTruckIds.length > 0;
+
+  const truckIdAllowedToUseBackup = backupCanBeUsed
+    ? unavailableMainTruckIds[0]
+    : null;
+
+  return basicAssignments.map((request) => {
+    const originalTruck = request.originalAssignedTruck;
+
+    if (
+      originalTruck.id !== "truck_4" &&
+      isTruckUnavailableForRoute(originalTruck.status)
+    ) {
+      if (
+        backupCanBeUsed &&
+        originalTruck.id === truckIdAllowedToUseBackup
+      ) {
+        return {
+          ...request,
+          assignedTruck: {
+            ...backupTruck,
+            status:
+              normalizeTruckStatus(backupTruck.status) === "available"
+                ? "backup_active"
+                : backupTruck.status,
+          },
+          isReassignedToBackup: true,
+          needsReschedule: false,
+          rescheduleReason: "",
+        };
+      }
+
+      return {
+        ...request,
+        assignedTruck: originalTruck,
+        isReassignedToBackup: false,
+        needsReschedule: true,
+        rescheduleReason: backupCanBeUsed
+          ? `${originalTruck.name} is unavailable and Truck 4 is already assigned as backup to another route. This request needs rescheduling.`
+          : `${originalTruck.name} is unavailable and no backup truck is currently available. This request needs rescheduling.`,
+      };
+    }
+
+    return request;
+  });
+}
+
+function getAssignedTruck(wasteType, trucksById = {}) {
+  const waste = String(wasteType || "").toLowerCase();
+
+  if (
+    waste.includes("recyclable") ||
+    waste.includes("plastic") ||
+    waste.includes("metal") ||
+    waste.includes("glass") ||
+    waste.includes("paper") ||
+    waste.includes("cardboard") ||
+    waste.includes("carton") ||
+    waste.includes("bote") ||
+    waste.includes("lata")
+  ) {
+    return trucksById.truck_1 || DEFAULT_TRUCKS[0];
+  }
+
+  if (
+    waste.includes("biodegradable") ||
+    waste.includes("bio") ||
+    waste.includes("food") ||
+    waste.includes("leaves") ||
+    waste.includes("leaf") ||
+    waste.includes("dahon") ||
+    waste.includes("nabubulok") ||
+    waste.includes("fruit") ||
+    waste.includes("vegetable")
+  ) {
+    return trucksById.truck_2 || DEFAULT_TRUCKS[1];
+  }
+
+  if (
+    waste.includes("residual") ||
+    waste.includes("non-biodegradable") ||
+    waste.includes("non biodegradable") ||
+    waste.includes("hindi nabubulok") ||
+    waste.includes("mixed") ||
+    waste.includes("wrapper") ||
+    waste.includes("sachet") ||
+    waste.includes("non-recyclable") ||
+    waste.includes("non recyclable")
+  ) {
+    return trucksById.truck_3 || DEFAULT_TRUCKS[2];
+  }
+
+  return trucksById.truck_4 || DEFAULT_TRUCKS[3];
+}
+
+function isTruckUnavailableForRoute(status) {
+  const normalized = normalizeTruckStatus(status);
+
+  return normalized === "under_maintenance" || normalized === "unavailable";
+}
+
+function normalizeTruckStatus(value) {
+  const status = String(value || "available").trim().toLowerCase();
+
+  if (TRUCK_STATUS_OPTIONS.includes(status)) {
+    return status;
+  }
+
+  return "available";
+}
+
+function getTruckStatusLabel(status) {
+  const normalized = normalizeTruckStatus(status);
+
+  const labels = {
+    available: "Available",
+    on_route: "On Route",
+    under_maintenance: "Under Maintenance",
+    unavailable: "Unavailable",
+    backup_active: "Backup Active",
+  };
+
+  return labels[normalized] || "Available";
+}
+
+function normalizeStatus(value) {
+  return String(value || "Pending").trim().toLowerCase();
+}
+
+function isActiveRouteStatus(status) {
+  return (
+    status === "pending" || status === "scheduled" || status === "in progress"
   );
 }
